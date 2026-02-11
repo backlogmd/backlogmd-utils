@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BacklogOutput } from "@backlogmd/parser";
+import type { BacklogOutput } from "@backlogmd/types";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const templatePath = path.resolve(__dirname, "..", "app", "dist", "index.html");
