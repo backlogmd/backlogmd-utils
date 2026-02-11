@@ -35,6 +35,7 @@ File: `backlog.md`
 ## Items
 
 ### <NNN> - <Item Name>
+
 - **Type:** <type>
 - **Status:** <status>
 - **Item:** [<item name>](items/<item-slug>/index.md)
@@ -66,9 +67,17 @@ File: `items/<item-slug>/index.md`
 
 ## Tasks
 
-| # | Task | Status | Owner | Depends on |
-|---|------|--------|-------|------------|
-| 001 | [Task name](001-task-slug.md) | <status> | <owner> | — |
+**5-column format (with dependencies):**
+
+| #   | Task                          | Status   | Owner   | Depends on |
+| --- | ----------------------------- | -------- | ------- | ---------- |
+| 001 | [Task name](001-task-slug.md) | <status> | <owner> | —          |
+
+**4-column format (without dependencies):**
+
+| #   | Task                          | Status   | Owner   |
+| --- | ----------------------------- | -------- | ------- |
+| 001 | [Task name](001-task-slug.md) | <status> | <owner> |
 ```
 
 - Item slug is lowercase kebab-case.
@@ -76,6 +85,7 @@ File: `items/<item-slug>/index.md`
 - Valid item statuses: `open`, `archived`.
 - Only `open` items accept new tasks.
 - The task table must stay in sync with the individual task files.
+- Task tables support both 4-column format (without dependencies) and 5-column format (with dependencies). Use 4-column format when projects don't need dependency tracking.
 
 ## Task Format
 
@@ -106,7 +116,7 @@ File: `items/<item-slug>/<NNN>-<task-slug>.md`
 - Owner is a handle (e.g. `@claude`) or `—` when unassigned.
 - The Item field links back to the parent item in `backlog.md`.
 - Acceptance criteria use markdown checkboxes.
-- `Depends on` and `Blocks` are optional. Omit them from task files and the task table column when the project doesn't need dependency tracking. When used, `Depends on` lists tasks that must be `done` before this task can start (markdown links: `[001 - Task name](001-task-slug.md)`). `Blocks` is the inverse. Use `—` for tasks with no dependencies when the column/field is present.
+- `Depends on` and `Blocks` are optional. When omitted, use the 4-column table format in the item index. When included, use the 5-column table format. Omit them from task files and the task table column when the project doesn't need dependency tracking. When used, `Depends on` lists tasks that must be `done` before this task can start (markdown links: `[001 - Task name](001-task-slug.md)`). `Blocks` is the inverse. Use `—` for tasks with no dependencies when the column/field is present.
 
 ## Archive
 
@@ -156,6 +166,5 @@ Rules:
 4. When all tasks in an item are `done`, the item may be archived. Archiving moves the item folder to `.archive/items/` and moves any newly `done` roadmap entries to `.archive/backlog.md`.
 5. A task cannot move to `in-progress` unless all of its dependencies are `done`.
 6. Circular dependencies are not allowed.
-7. When an agent begins work on a task, it must update the task status to `in-progress` in both the task file and the item's task table.
-8. When an agent completes a task, it must update the task status to `done` in both the task file and the item's task table.
-9. When all tasks in an item reach `done`, the item's roadmap status in `backlog.md` must be updated to reflect the derived status.
+7. When an agent changes a task's status, it must update **all three locations**: the task file, the item's task table in `index.md`, and the item's derived status in `backlog.md`. This applies to every status transition, not just completion.
+8. When all tasks in an item reach `done`, the item may be archived (see rule 4).

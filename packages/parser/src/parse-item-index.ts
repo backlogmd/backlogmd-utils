@@ -1,21 +1,6 @@
-import type {
-  Heading,
-  List,
-  ListItem,
-  Table,
-  TableRow,
-  Link,
-  PhrasingContent,
-  Text,
-} from "mdast";
+import type { Heading, List, ListItem, Table, TableRow, Link, PhrasingContent, Text } from "mdast";
 import { parseMd } from "./md.js";
-import type {
-  ItemFolder,
-  ItemFolderStatus,
-  ItemType,
-  TaskStatus,
-  TaskStub,
-} from "./types.js";
+import type { ItemFolder, ItemFolderStatus, ItemType, TaskStatus, TaskStub } from "./types.js";
 
 const ITEM_FOLDER_STATUSES: readonly string[] = ["open", "archived"];
 const VALID_ITEM_TYPES: readonly string[] = ["feature", "bugfix", "refactor", "chore"];
@@ -117,10 +102,8 @@ function parseOwner(raw: string): string | null {
 
 function parseTaskRow(row: TableRow, source: string): TaskStub {
   const cells = row.children;
-  if (cells.length < 5) {
-    throw new Error(
-      `Task table row has ${cells.length} columns, expected 5 in ${source}`,
-    );
+  if (cells.length < 4 || cells.length > 5) {
+    throw new Error(`Task table row has ${cells.length} columns, expected 4 or 5 in ${source}`);
   }
 
   const priorityText = extractInlineText(cells[0].children as PhrasingContent[]);
@@ -136,9 +119,7 @@ function parseTaskRow(row: TableRow, source: string): TaskStub {
     name = extractInlineText(link.children as PhrasingContent[]);
     fileName = link.url;
   } else {
-    throw new Error(
-      `Task table row missing link in task column in ${source}`,
-    );
+    throw new Error(`Task table row missing link in task column in ${source}`);
   }
 
   const statusText = extractInlineText(cells[2].children as PhrasingContent[])
@@ -154,8 +135,14 @@ function parseTaskRow(row: TableRow, source: string): TaskStub {
   const ownerText = extractInlineText(cells[3].children as PhrasingContent[]);
   const owner = parseOwner(ownerText);
 
-  const dependsText = extractInlineText(cells[4].children as PhrasingContent[]);
-  const dependsOn = parseDependsOn(dependsText);
+  let dependsOn: string[];
+  if (cells.length === 5) {
+    const dependsText = extractInlineText(cells[4].children as PhrasingContent[]);
+    dependsOn = parseDependsOn(dependsText);
+  } else {
+    // 4-column format without dependencies
+    dependsOn = [];
+  }
 
   return { priority, name, fileName, status, owner, dependsOn };
 }
@@ -171,18 +158,14 @@ function findLink(nodes: PhrasingContent[]): Link | null {
   return null;
 }
 
-export function parseItemIndex(
-  content: string,
-  slug: string,
-  source: string,
-): ItemFolder {
+export function parseItemIndex(content: string, slug: string, source: string): ItemFolder {
   const tree = parseMd(content);
   const children = tree.children;
 
   // 1. Find the h1 heading "# <Item Name>"
-  const h1 = children.find(
-    (n) => n.type === "heading" && (n as Heading).depth === 1,
-  ) as Heading | undefined;
+  const h1 = children.find((n) => n.type === "heading" && (n as Heading).depth === 1) as
+    | Heading
+    | undefined;
 
   if (!h1) {
     throw new Error(`Missing h1 heading in ${source}`);
@@ -220,8 +203,7 @@ export function parseItemIndex(
     if (
       node.type === "heading" &&
       (node as Heading).depth === 2 &&
-      extractInlineText((node as Heading).children as PhrasingContent[])
-        .toLowerCase() === "tasks"
+      extractInlineText((node as Heading).children as PhrasingContent[]).toLowerCase() === "tasks"
     ) {
       foundTasksHeading = true;
       // Look for table after this heading

@@ -214,9 +214,7 @@ describe("parseItemIndex", () => {
 |---|------|--------|-------|------------|
 `;
 
-    expect(() => parseItemIndex(md, "bad", "items/bad/index.md")).toThrow(
-      /Missing h1 heading/,
-    );
+    expect(() => parseItemIndex(md, "bad", "items/bad/index.md")).toThrow(/Missing h1 heading/);
   });
 
   it("throws on missing ## Tasks section", () => {
@@ -345,5 +343,141 @@ No table here.
 
     const result = parseItemIndex(md, "empty", "items/empty/index.md");
     expect(result.tasks).toEqual([]);
+  });
+
+  describe("4-column task tables", () => {
+    it("parses 4-column table without dependencies", () => {
+      const md = `# Simple Feature
+
+- **Type:** feature
+- **Status:** open
+- **Goal:** Test 4-column tables
+
+## Tasks
+
+| # | Task | Status | Owner |
+|---|------|--------|-------|
+| 001 | [Simple task](001-simple.md) | todo | @alice |
+| 002 | [Another task](002-another.md) | done | — |
+`;
+
+      const result = parseItemIndex(md, "simple", "items/simple/index.md");
+      expect(result.tasks).toHaveLength(2);
+
+      expect(result.tasks[0]).toEqual({
+        priority: "001",
+        name: "Simple task",
+        fileName: "001-simple.md",
+        status: "todo",
+        owner: "@alice",
+        dependsOn: [],
+      });
+
+      expect(result.tasks[1]).toEqual({
+        priority: "002",
+        name: "Another task",
+        fileName: "002-another.md",
+        status: "done",
+        owner: null,
+        dependsOn: [],
+      });
+    });
+
+    it("handles all valid task statuses in 4-column format", () => {
+      const statuses = ["todo", "in-progress", "ready-to-review", "ready-to-test", "done"];
+
+      for (const status of statuses) {
+        const md = `# Status Test
+
+- **Type:** feature
+- **Status:** open
+- **Goal:** testing
+
+## Tasks
+
+| # | Task | Status | Owner |
+|---|------|--------|-------|
+| 001 | [Task](001-task.md) | ${status} | — |
+`;
+
+        const result = parseItemIndex(md, "s", "s.md");
+        expect(result.tasks[0].status).toBe(status);
+        expect(result.tasks[0].dependsOn).toEqual([]);
+      }
+    });
+
+    it("handles unassigned owner in 4-column format", () => {
+      const md = `# Test
+
+- **Type:** feature
+- **Status:** open
+- **Goal:** testing owners
+
+## Tasks
+
+| # | Task | Status | Owner |
+|---|------|--------|-------|
+| 001 | [Task one](001-task.md) | todo | — |
+`;
+
+      const result = parseItemIndex(md, "test", "items/test/index.md");
+      expect(result.tasks[0].owner).toBeNull();
+      expect(result.tasks[0].dependsOn).toEqual([]);
+    });
+
+    it("handles empty 4-column table (header only)", () => {
+      const md = `# Empty
+
+- **Type:** feature
+- **Status:** open
+- **Goal:** nothing yet
+
+## Tasks
+
+| # | Task | Status | Owner |
+|---|------|--------|-------|
+`;
+
+      const result = parseItemIndex(md, "empty", "items/empty/index.md");
+      expect(result.tasks).toEqual([]);
+    });
+
+    it("throws error on 3-column table (too few columns)", () => {
+      const md = `# Bad Table
+
+- **Type:** feature
+- **Status:** open
+- **Goal:** bad format
+
+## Tasks
+
+| # | Task | Status |
+|---|------|--------|
+| 001 | [Task](001-task.md) | todo |
+`;
+
+      expect(() => parseItemIndex(md, "bad", "items/bad/index.md")).toThrow(
+        /Task table row has 3 columns, expected 4 or 5/,
+      );
+    });
+
+    it("throws error on 6-column table (too many columns)", () => {
+      const md = `# Bad Table
+
+- **Type:** feature
+- **Status:** open
+- **Goal:** bad format
+
+## Tasks
+
+| # | Task | Status | Owner | Depends on | Extra |
+|---|------|--------|-------|------------|-------|
+| 001 | [Task](001-task.md) | todo | @alice | — | extra |
+`;
+
+      expect(() => parseItemIndex(md, "bad", "items/bad/index.md")).toThrow(
+        /Task table row has 6 columns, expected 4 or 5/,
+      );
+    });
   });
 });
