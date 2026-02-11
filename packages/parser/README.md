@@ -21,10 +21,10 @@ import { buildBacklogOutput, serializeOutput } from "@backlogmd/parser";
 
 const output = buildBacklogOutput(".backlogmd");
 
-console.log(output.items);        // RoadmapItem[]
-console.log(output.itemFolders);  // ItemFolder[]
-console.log(output.tasks);        // Task[]
-console.log(output.validation);   // { errors, warnings }
+console.log(output.items); // RoadmapItem[]
+console.log(output.itemFolders); // ItemFolder[]
+console.log(output.tasks); // Task[]
+console.log(output.validation); // { errors, warnings }
 ```
 
 ### `serializeOutput(output)`
@@ -49,6 +49,34 @@ writeOutput(output, "backlog.json");
 // Or just get the string
 const json = writeOutput(output);
 ```
+
+## Task Table Formats
+
+The parser supports both 4-column and 5-column task table formats:
+
+### 4-Column Format (Without Dependencies)
+
+Use this format when projects don't need dependency tracking:
+
+```md
+| #   | Task                                | Status | Owner  |
+| --- | ----------------------------------- | ------ | ------ |
+| 001 | [Setup project](001-setup.md)       | todo   | @alice |
+| 002 | [Implement feature](002-feature.md) | done   | —      |
+```
+
+### 5-Column Format (With Dependencies)
+
+Use this format when projects need to track task dependencies:
+
+```md
+| #   | Task                                | Status | Owner  | Depends on |
+| --- | ----------------------------------- | ------ | ------ | ---------- |
+| 001 | [Setup project](001-setup.md)       | todo   | @alice | —          |
+| 002 | [Implement feature](002-feature.md) | done   | @bob   | 001        |
+```
+
+Both formats are fully supported by the parser. When using 4-column format, task dependencies default to an empty array.
 
 ## Types
 
