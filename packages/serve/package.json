@@ -3,6 +3,24 @@
   "version": "0.1.0",
   "description": "Development server for BacklogMD kanban board",
   "type": "module",
+  "license": "MIT",
+  "author": "BacklogMD",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/backlogmd/backlogmd-utils.git",
+    "directory": "packages/serve"
+  },
+  "keywords": [
+    "backlogmd",
+    "backlog",
+    "kanban",
+    "dev-server",
+    "markdown",
+    "project-management"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -20,9 +38,11 @@
     "app/dist"
   ],
   "scripts": {
+    "clean": "rm -rf dist app/dist",
     "build:app": "vite build --config app/vite.config.ts",
     "build:server": "tsc",
     "build": "npm run build:app && npm run build:server",
+    "prepublishOnly": "npm run clean && npm run build",
     "serve": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",

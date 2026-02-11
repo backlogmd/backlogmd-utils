@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { isUrl, fetchContent } from "@backlogmd/parser";
+import { isUrl, fetchContent } from "../packages/parser/src/fetch.js";
 
 describe("isUrl", () => {
   it("returns true for http:// URLs", () => {

@@ -7,8 +7,8 @@ function makeOutput(overrides: Partial<BacklogOutput> = {}): BacklogOutput {
     protocol: "backlogmd/v1",
     generatedAt: "2026-01-01T00:00:00.000Z",
     rootDir: "/test/.backlogmd",
-    features: [],
-    featureFolders: [],
+    items: [],
+    itemFolders: [],
     tasks: [],
     validation: { errors: [], warnings: [] },
     ...overrides,
@@ -25,15 +25,16 @@ describe("serializeOutput", () => {
     expect(json.rootDir).toBe("/test/.backlogmd");
   });
 
-  it("serializes features with statusDeclared/statusDerived and tasks as refs", () => {
+  it("serializes items with type, statusDeclared/statusDerived and tasks as refs", () => {
     const output = makeOutput({
-      features: [
+      items: [
         {
           id: "001",
           name: "Auth",
+          type: "feature",
           status: "todo",
           statusDerived: "in-progress",
-          featureSlug: "auth",
+          itemSlug: "auth",
           description: "Auth feature",
           taskRefs: ["auth/001", "auth/002"],
           source: "backlog.md",
@@ -42,25 +43,27 @@ describe("serializeOutput", () => {
     });
 
     const json = JSON.parse(serializeOutput(output));
-    const feature = json.features[0];
+    const item = json.items[0];
 
-    expect(feature.statusDeclared).toBe("todo");
-    expect(feature.statusDerived).toBe("in-progress");
-    expect(feature.slug).toBe("auth");
-    expect(feature.tasks).toEqual(["auth/001", "auth/002"]);
-    expect(feature.source).toBe("backlog.md");
+    expect(item.type).toBe("feature");
+    expect(item.statusDeclared).toBe("todo");
+    expect(item.statusDerived).toBe("in-progress");
+    expect(item.slug).toBe("auth");
+    expect(item.tasks).toEqual(["auth/001", "auth/002"]);
+    expect(item.source).toBe("backlog.md");
     // Should NOT have internal field names
-    expect(feature.status).toBeUndefined();
-    expect(feature.featureSlug).toBeUndefined();
-    expect(feature.taskRefs).toBeUndefined();
+    expect(item.status).toBeUndefined();
+    expect(item.itemSlug).toBeUndefined();
+    expect(item.taskRefs).toBeUndefined();
   });
 
-  it("serializes featureFolders with task priorities only", () => {
+  it("serializes itemFolders with type and task priorities only", () => {
     const output = makeOutput({
-      featureFolders: [
+      itemFolders: [
         {
           slug: "auth",
           name: "Auth",
+          type: "feature",
           status: "open",
           goal: "Add auth",
           tasks: [
@@ -81,17 +84,18 @@ describe("serializeOutput", () => {
               dependsOn: ["001"],
             },
           ],
-          source: "features/auth/index.md",
+          source: "items/auth/index.md",
         },
       ],
     });
 
     const json = JSON.parse(serializeOutput(output));
-    const folder = json.featureFolders[0];
+    const folder = json.itemFolders[0];
 
     expect(folder.tasks).toEqual(["001", "002"]);
+    expect(folder.type).toBe("feature");
     expect(folder.slug).toBe("auth");
-    expect(folder.source).toBe("features/auth/index.md");
+    expect(folder.source).toBe("items/auth/index.md");
   });
 
   it("serializes tasks with all fields including dependencies", () => {
@@ -104,7 +108,7 @@ describe("serializeOutput", () => {
           status: "done",
           priority: "001",
           owner: "@alice",
-          featureId: "001",
+          itemId: "001",
           dependsOn: [],
           blocks: ["auth/002"],
           description: "Set things up",
@@ -112,7 +116,7 @@ describe("serializeOutput", () => {
             { text: "Works", checked: true },
             { text: "Tests pass", checked: false },
           ],
-          source: "features/auth/001-setup.md",
+          source: "items/auth/001-setup.md",
         },
       ],
     });
@@ -121,12 +125,13 @@ describe("serializeOutput", () => {
     const task = json.tasks[0];
 
     expect(task.id).toBe("auth/001");
+    expect(task.itemId).toBe("001");
     expect(task.dependsOn).toEqual([]);
     expect(task.blocks).toEqual(["auth/002"]);
     expect(task.owner).toBe("@alice");
     expect(task.acceptanceCriteria).toHaveLength(2);
     expect(task.acceptanceCriteria[0].checked).toBe(true);
-    expect(task.source).toBe("features/auth/001-setup.md");
+    expect(task.source).toBe("items/auth/001-setup.md");
   });
 
   it("serializes validation errors and warnings", () => {
@@ -147,13 +152,14 @@ describe("serializeOutput", () => {
 
   it("output is valid UTF-8 JSON", () => {
     const output = makeOutput({
-      features: [
+      items: [
         {
           id: "001",
-          name: "Ünïcödé Feature",
+          name: "Ünïcödé Item",
+          type: "feature",
           status: "todo",
           statusDerived: "todo",
-          featureSlug: null,
+          itemSlug: null,
           description: "Handles émojis 🎉",
           taskRefs: [],
           source: "backlog.md",

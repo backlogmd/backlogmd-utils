@@ -11,31 +11,33 @@ describe("integration: happy-path fixture", () => {
     expect(output.protocol).toBe("backlogmd/v1");
   });
 
-  it("parses one feature with correct fields", () => {
-    expect(output.features).toHaveLength(1);
+  it("parses one item with correct fields", () => {
+    expect(output.items).toHaveLength(1);
 
-    const f = output.features[0];
-    expect(f.id).toBe("001");
-    expect(f.name).toBe("My Feature");
-    expect(f.status).toBe("in-progress");
-    expect(f.featureSlug).toBe("my-feature");
-    expect(f.description).toBe("A test feature for integration testing.");
-    expect(f.taskRefs).toEqual(["my-feature/001", "my-feature/002"]);
+    const item = output.items[0];
+    expect(item.id).toBe("001");
+    expect(item.name).toBe("My Feature");
+    expect(item.type).toBe("feature");
+    expect(item.status).toBe("in-progress");
+    expect(item.itemSlug).toBe("my-feature");
+    expect(item.description).toBe("A test feature for integration testing.");
+    expect(item.taskRefs).toEqual(["my-feature/001", "my-feature/002"]);
   });
 
-  it("derives feature status as in-progress", () => {
-    expect(output.features[0].statusDerived).toBe("in-progress");
+  it("derives item status as in-progress", () => {
+    expect(output.items[0].statusDerived).toBe("in-progress");
   });
 
-  it("parses one feature folder", () => {
-    expect(output.featureFolders).toHaveLength(1);
+  it("parses one item folder", () => {
+    expect(output.itemFolders).toHaveLength(1);
 
-    const ff = output.featureFolders[0];
-    expect(ff.slug).toBe("my-feature");
-    expect(ff.name).toBe("My Feature");
-    expect(ff.status).toBe("open");
-    expect(ff.goal).toBe("Validate the full parser pipeline end-to-end.");
-    expect(ff.tasks).toHaveLength(2);
+    const folder = output.itemFolders[0];
+    expect(folder.slug).toBe("my-feature");
+    expect(folder.name).toBe("My Feature");
+    expect(folder.type).toBe("feature");
+    expect(folder.status).toBe("open");
+    expect(folder.goal).toBe("Validate the full parser pipeline end-to-end.");
+    expect(folder.tasks).toHaveLength(2);
   });
 
   it("parses two tasks with correct data", () => {
@@ -45,7 +47,7 @@ describe("integration: happy-path fixture", () => {
     expect(t1.name).toBe("Setup project");
     expect(t1.status).toBe("done");
     expect(t1.owner).toBe("@alice");
-    expect(t1.featureId).toBe("001");
+    expect(t1.itemId).toBe("001");
     expect(t1.dependsOn).toEqual([]);
     expect(t1.acceptanceCriteria).toHaveLength(2);
     expect(t1.acceptanceCriteria.every((ac) => ac.checked)).toBe(true);
@@ -67,11 +69,14 @@ describe("integration: happy-path fixture", () => {
   it("serializes to valid JSON with canonical shape", () => {
     const json = JSON.parse(serializeOutput(output));
 
-    expect(json.features[0].statusDeclared).toBe("in-progress");
-    expect(json.features[0].statusDerived).toBe("in-progress");
-    expect(json.features[0].slug).toBe("my-feature");
-    expect(json.features[0].tasks).toEqual(["my-feature/001", "my-feature/002"]);
-    expect(json.featureFolders[0].tasks).toEqual(["001", "002"]);
+    expect(json.items[0].type).toBe("feature");
+    expect(json.items[0].statusDeclared).toBe("in-progress");
+    expect(json.items[0].statusDerived).toBe("in-progress");
+    expect(json.items[0].slug).toBe("my-feature");
+    expect(json.items[0].tasks).toEqual(["my-feature/001", "my-feature/002"]);
+    expect(json.itemFolders[0].type).toBe("feature");
+    expect(json.itemFolders[0].tasks).toEqual(["001", "002"]);
+    expect(json.tasks[0].itemId).toBeDefined();
     expect(json.tasks[0].dependsOn).toBeDefined();
     expect(json.tasks[0].blocks).toBeDefined();
   });
@@ -80,8 +85,8 @@ describe("integration: happy-path fixture", () => {
 describe("integration: with-warnings fixture", () => {
   const output = buildBacklogOutput(path.join(FIXTURES, "with-warnings"));
 
-  it("parses feature and tasks", () => {
-    expect(output.features).toHaveLength(1);
+  it("parses item and tasks", () => {
+    expect(output.items).toHaveLength(1);
     expect(output.tasks).toHaveLength(2);
   });
 
@@ -99,13 +104,13 @@ describe("integration: with-warnings fixture", () => {
     expect(ownerWarning!.message).toContain("@bob");
   });
 
-  it("produces feature status mismatch warning (declared todo, derived in-progress)", () => {
-    const featureWarning = output.validation.warnings.find(
-      (w) => w.code === "FEATURE_STATUS_MISMATCH",
+  it("produces item status mismatch warning (declared todo, derived in-progress)", () => {
+    const itemWarning = output.validation.warnings.find(
+      (w) => w.code === "ITEM_STATUS_MISMATCH",
     );
-    expect(featureWarning).toBeDefined();
-    expect(featureWarning!.message).toContain("todo");
-    expect(featureWarning!.message).toContain("in-progress");
+    expect(itemWarning).toBeDefined();
+    expect(itemWarning!.message).toContain("todo");
+    expect(itemWarning!.message).toContain("in-progress");
   });
 
   it("has no validation errors", () => {

@@ -1,5 +1,6 @@
 {
   "name": "backlogmd-parser",
+  "private": true,
   "version": "0.1.0",
   "description": "CLI for BacklogMD parser",
   "type": "module",

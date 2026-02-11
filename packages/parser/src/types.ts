@@ -1,24 +1,28 @@
-export type FeatureStatus = "todo" | "in-progress" | "done";
+export type ItemType = "feature" | "bugfix" | "refactor" | "chore";
 
-export type FeatureFolderStatus = "open" | "archived";
+export type ItemStatus = "todo" | "in-progress" | "done";
+
+export type ItemFolderStatus = "open" | "archived";
 
 export type TaskStatus = "todo" | "in-progress" | "ready-to-review" | "ready-to-test" | "done";
 
-export interface RoadmapFeature {
+export interface RoadmapItem {
   id: string;
   name: string;
-  status: FeatureStatus;
-  statusDerived: FeatureStatus | null;
-  featureSlug: string | null;
+  type: ItemType;
+  status: ItemStatus;
+  statusDerived: ItemStatus | null;
+  itemSlug: string | null;
   description: string;
   taskRefs: string[];
   source: string;
 }
 
-export interface FeatureFolder {
+export interface ItemFolder {
   slug: string;
   name: string;
-  status: FeatureFolderStatus;
+  type: ItemType;
+  status: ItemFolderStatus;
   goal: string;
   tasks: TaskStub[];
   source: string;
@@ -40,7 +44,7 @@ export interface Task {
   status: TaskStatus;
   priority: string;
   owner: string | null;
-  featureId: string;
+  itemId: string;
   dependsOn: string[];
   blocks: string[];
   description: string;
@@ -63,8 +67,8 @@ export interface BacklogOutput {
   protocol: string;
   generatedAt: string;
   rootDir: string;
-  features: RoadmapFeature[];
-  featureFolders: FeatureFolder[];
+  items: RoadmapItem[];
+  itemFolders: ItemFolder[];
   tasks: Task[];
   validation: {
     errors: ValidationIssue[];

@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { parseFeatureIndex } from "@backlogmd/parser";
+import { parseItemIndex } from "../packages/parser/src/parse-item-index.js";
 
-const VALID_FEATURE = `# Feature: User Authentication
+const VALID_ITEM = `# User Authentication
 
+- **Type:** feature
 - **Status:** open
 - **Goal:** Allow users to sign in securely
 
@@ -15,15 +16,16 @@ const VALID_FEATURE = `# Feature: User Authentication
 | 003 | [Session management](003-session-mgmt.md) | done | — | 001, 002 |
 `;
 
-describe("parseFeatureIndex", () => {
-  it("parses a valid feature index", () => {
-    const result = parseFeatureIndex(VALID_FEATURE, "user-auth", "features/user-auth/index.md");
+describe("parseItemIndex", () => {
+  it("parses a valid item index", () => {
+    const result = parseItemIndex(VALID_ITEM, "user-auth", "items/user-auth/index.md");
 
     expect(result.slug).toBe("user-auth");
     expect(result.name).toBe("User Authentication");
+    expect(result.type).toBe("feature");
     expect(result.status).toBe("open");
     expect(result.goal).toBe("Allow users to sign in securely");
-    expect(result.source).toBe("features/user-auth/index.md");
+    expect(result.source).toBe("items/user-auth/index.md");
     expect(result.tasks).toHaveLength(3);
 
     expect(result.tasks[0]).toEqual({
@@ -54,9 +56,10 @@ describe("parseFeatureIndex", () => {
     });
   });
 
-  it("parses archived feature status", () => {
-    const md = `# Feature: Old Feature
+  it("parses archived item status", () => {
+    const md = `# Old Feature
 
+- **Type:** feature
 - **Status:** archived
 - **Goal:** Legacy feature
 
@@ -67,14 +70,19 @@ describe("parseFeatureIndex", () => {
 | 001 | [Only task](001-only.md) | done | @dev | — |
 `;
 
-    const result = parseFeatureIndex(md, "old-feature", "features/old-feature/index.md");
+    const result = parseItemIndex(md, "old-feature", "items/old-feature/index.md");
     expect(result.status).toBe("archived");
   });
 
-  it("throws on missing goal", () => {
-    const md = `# Feature: No Goal
+  it("parses all valid item types", () => {
+    const types = ["feature", "bugfix", "refactor", "chore"];
 
+    for (const type of types) {
+      const md = `# Type Test
+
+- **Type:** ${type}
 - **Status:** open
+- **Goal:** testing types
 
 ## Tasks
 
@@ -83,14 +91,15 @@ describe("parseFeatureIndex", () => {
 | 001 | [Task](001-task.md) | todo | — | — |
 `;
 
-    expect(() => parseFeatureIndex(md, "no-goal", "features/no-goal/index.md")).toThrow(
-      /Missing "Goal" metadata/,
-    );
+      const result = parseItemIndex(md, "t", "t.md");
+      expect(result.type).toBe(type);
+    }
   });
 
-  it("throws on missing status", () => {
-    const md = `# Feature: No Status
+  it("throws on missing type", () => {
+    const md = `# No Type
 
+- **Status:** open
 - **Goal:** something
 
 ## Tasks
@@ -100,14 +109,70 @@ describe("parseFeatureIndex", () => {
 | 001 | [Task](001-task.md) | todo | — | — |
 `;
 
-    expect(() => parseFeatureIndex(md, "no-status", "features/no-status/index.md")).toThrow(
+    expect(() => parseItemIndex(md, "no-type", "items/no-type/index.md")).toThrow(
+      /Missing "Type" metadata/,
+    );
+  });
+
+  it("throws on invalid item type", () => {
+    const md = `# Bad Type
+
+- **Type:** epic
+- **Status:** open
+- **Goal:** something
+
+## Tasks
+
+| # | Task | Status | Owner | Depends on |
+|---|------|--------|-------|------------|
+| 001 | [Task](001-task.md) | todo | — | — |
+`;
+
+    expect(() => parseItemIndex(md, "bad", "items/bad/index.md")).toThrow(
+      /Invalid item type "epic"/,
+    );
+  });
+
+  it("throws on missing goal", () => {
+    const md = `# No Goal
+
+- **Type:** feature
+- **Status:** open
+
+## Tasks
+
+| # | Task | Status | Owner | Depends on |
+|---|------|--------|-------|------------|
+| 001 | [Task](001-task.md) | todo | — | — |
+`;
+
+    expect(() => parseItemIndex(md, "no-goal", "items/no-goal/index.md")).toThrow(
+      /Missing "Goal" metadata/,
+    );
+  });
+
+  it("throws on missing status", () => {
+    const md = `# No Status
+
+- **Type:** feature
+- **Goal:** something
+
+## Tasks
+
+| # | Task | Status | Owner | Depends on |
+|---|------|--------|-------|------------|
+| 001 | [Task](001-task.md) | todo | — | — |
+`;
+
+    expect(() => parseItemIndex(md, "no-status", "items/no-status/index.md")).toThrow(
       /Missing "Status" metadata/,
     );
   });
 
-  it("throws on invalid feature status", () => {
-    const md = `# Feature: Bad Status
+  it("throws on invalid item status", () => {
+    const md = `# Bad Status
 
+- **Type:** feature
 - **Status:** completed
 - **Goal:** something
 
@@ -118,14 +183,15 @@ describe("parseFeatureIndex", () => {
 | 001 | [Task](001-task.md) | todo | — | — |
 `;
 
-    expect(() => parseFeatureIndex(md, "bad", "features/bad/index.md")).toThrow(
-      /Invalid feature status "completed"/,
+    expect(() => parseItemIndex(md, "bad", "items/bad/index.md")).toThrow(
+      /Invalid item status "completed"/,
     );
   });
 
   it("throws on invalid task status", () => {
-    const md = `# Feature: Bad Task Status
+    const md = `# Bad Task Status
 
+- **Type:** feature
 - **Status:** open
 - **Goal:** something
 
@@ -136,25 +202,8 @@ describe("parseFeatureIndex", () => {
 | 001 | [Task](001-task.md) | blocked | @alice | — |
 `;
 
-    expect(() => parseFeatureIndex(md, "bad-task", "features/bad-task/index.md")).toThrow(
+    expect(() => parseItemIndex(md, "bad-task", "items/bad-task/index.md")).toThrow(
       /Invalid task status "blocked"/,
-    );
-  });
-
-  it("throws on missing Feature heading", () => {
-    const md = `# Something Else
-
-- **Status:** open
-- **Goal:** something
-
-## Tasks
-
-| # | Task | Status | Owner | Depends on |
-|---|------|--------|-------|------------|
-`;
-
-    expect(() => parseFeatureIndex(md, "bad", "features/bad/index.md")).toThrow(
-      /Heading must start with "Feature: "/,
     );
   });
 
@@ -165,26 +214,28 @@ describe("parseFeatureIndex", () => {
 |---|------|--------|-------|------------|
 `;
 
-    expect(() => parseFeatureIndex(md, "bad", "features/bad/index.md")).toThrow(
-      /Missing "# Feature: ..." heading/,
+    expect(() => parseItemIndex(md, "bad", "items/bad/index.md")).toThrow(
+      /Missing h1 heading/,
     );
   });
 
   it("throws on missing ## Tasks section", () => {
-    const md = `# Feature: No Tasks
+    const md = `# No Tasks
 
+- **Type:** feature
 - **Status:** open
 - **Goal:** something
 `;
 
-    expect(() => parseFeatureIndex(md, "no-tasks", "features/no-tasks/index.md")).toThrow(
+    expect(() => parseItemIndex(md, "no-tasks", "items/no-tasks/index.md")).toThrow(
       /Missing "## Tasks" section/,
     );
   });
 
   it("throws on missing table under ## Tasks", () => {
-    const md = `# Feature: No Table
+    const md = `# No Table
 
+- **Type:** feature
 - **Status:** open
 - **Goal:** something
 
@@ -193,14 +244,15 @@ describe("parseFeatureIndex", () => {
 No table here.
 `;
 
-    expect(() => parseFeatureIndex(md, "no-table", "features/no-table/index.md")).toThrow(
+    expect(() => parseItemIndex(md, "no-table", "items/no-table/index.md")).toThrow(
       /Missing tasks table under "## Tasks"/,
     );
   });
 
   it("handles unassigned owner (em dash) as null", () => {
-    const md = `# Feature: Test
+    const md = `# Test
 
+- **Type:** feature
 - **Status:** open
 - **Goal:** testing owners
 
@@ -211,13 +263,14 @@ No table here.
 | 001 | [Task one](001-task.md) | todo | — | — |
 `;
 
-    const result = parseFeatureIndex(md, "test", "features/test/index.md");
+    const result = parseItemIndex(md, "test", "items/test/index.md");
     expect(result.tasks[0].owner).toBeNull();
   });
 
   it("parses dependency references correctly", () => {
-    const md = `# Feature: Deps
+    const md = `# Deps
 
+- **Type:** feature
 - **Status:** open
 - **Goal:** test dependencies
 
@@ -230,15 +283,16 @@ No table here.
 | 003 | [Third](003-third.md) | todo | @c | 001, 002 |
 `;
 
-    const result = parseFeatureIndex(md, "deps", "features/deps/index.md");
+    const result = parseItemIndex(md, "deps", "items/deps/index.md");
     expect(result.tasks[0].dependsOn).toEqual([]);
     expect(result.tasks[1].dependsOn).toEqual(["001"]);
     expect(result.tasks[2].dependsOn).toEqual(["001", "002"]);
   });
 
   it("throws when task row is missing the link", () => {
-    const md = `# Feature: No Link
+    const md = `# No Link
 
+- **Type:** feature
 - **Status:** open
 - **Goal:** test
 
@@ -249,7 +303,7 @@ No table here.
 | 001 | Just plain text | todo | @a | — |
 `;
 
-    expect(() => parseFeatureIndex(md, "no-link", "features/no-link/index.md")).toThrow(
+    expect(() => parseItemIndex(md, "no-link", "items/no-link/index.md")).toThrow(
       /missing link in task column/,
     );
   });
@@ -258,8 +312,9 @@ No table here.
     const statuses = ["todo", "in-progress", "ready-to-review", "ready-to-test", "done"];
 
     for (const status of statuses) {
-      const md = `# Feature: Status Test
+      const md = `# Status Test
 
+- **Type:** feature
 - **Status:** open
 - **Goal:** testing
 
@@ -270,14 +325,15 @@ No table here.
 | 001 | [Task](001-task.md) | ${status} | — | — |
 `;
 
-      const result = parseFeatureIndex(md, "s", "s.md");
+      const result = parseItemIndex(md, "s", "s.md");
       expect(result.tasks[0].status).toBe(status);
     }
   });
 
   it("handles empty tasks table (header only)", () => {
-    const md = `# Feature: Empty
+    const md = `# Empty
 
+- **Type:** feature
 - **Status:** open
 - **Goal:** nothing yet
 
@@ -287,7 +343,7 @@ No table here.
 |---|------|--------|-------|------------|
 `;
 
-    const result = parseFeatureIndex(md, "empty", "features/empty/index.md");
+    const result = parseItemIndex(md, "empty", "items/empty/index.md");
     expect(result.tasks).toEqual([]);
   });
 });

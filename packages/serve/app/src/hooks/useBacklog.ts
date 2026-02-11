@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 
 interface BacklogData {
-  features: unknown[];
-  featureFolders: unknown[];
+  items: unknown[];
+  itemFolders: unknown[];
   [key: string]: unknown;
 }
 
@@ -13,9 +13,7 @@ declare global {
 }
 
 export function useBacklog() {
-  const [data, setData] = useState<BacklogData | null>(
-    () => window.__BACKLOG__ ?? null,
-  );
+  const [data, setData] = useState<BacklogData | null>(() => window.__BACKLOG__ ?? null);
   const [connected, setConnected] = useState(false);
   const esRef = useRef<EventSource | null>(null);
 

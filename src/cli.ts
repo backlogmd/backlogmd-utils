@@ -2,7 +2,8 @@
 
 import path from "node:path";
 import fs from "node:fs";
-import { buildBacklogOutput, serializeOutput, isUrl, fetchContent } from "@backlogmd/parser";
+import { buildBacklogOutput, serializeOutput } from "@backlogmd/parser";
+import { isUrl, fetchContent } from "../packages/parser/dist/fetch.js";
 
 export interface CliArgs {
   input: string;

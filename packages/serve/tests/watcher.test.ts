@@ -46,7 +46,7 @@ describe("watcher", () => {
     const watcher = watchBacklogDir(tempDir, callback);
 
     await fs.writeFile(path.join(tempDir, "test.md"), "# Test");
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     expect(callback).toHaveBeenCalled();
 

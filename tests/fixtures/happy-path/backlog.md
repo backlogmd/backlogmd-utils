@@ -1,8 +1,9 @@
 # Roadmap
 
-## Features
+## Items
 
 ### 001 - My Feature
+- **Type:** feature
 - **Status:** in-progress
-- **Feature:** [My Feature](features/my-feature/index.md)
+- **Item:** [My Feature](items/my-feature/index.md)
 - **Description:** A test feature for integration testing.

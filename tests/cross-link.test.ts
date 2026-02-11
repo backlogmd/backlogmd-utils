@@ -1,178 +1,190 @@
 import { describe, it, expect } from "vitest";
-import { crossLink } from "@backlogmd/parser";
-import type { RoadmapFeature, FeatureFolder, Task } from "@backlogmd/parser";
+import { crossLink } from "../packages/parser/src/cross-link.js";
+import type { RoadmapItem, ItemFolder, Task } from "@backlogmd/parser";
 
-function makeFeature(overrides: Partial<RoadmapFeature> = {}): RoadmapFeature {
+function makeItem(overrides: Partial<RoadmapItem> = {}): RoadmapItem {
   return {
     id: "001",
-    name: "Test Feature",
+    name: "Test Item",
+    type: "feature",
     status: "todo",
     statusDerived: null,
-    featureSlug: "test-feature",
-    description: "A test feature",
+    itemSlug: "test-item",
+    description: "A test item",
     taskRefs: [],
     source: "backlog.md",
     ...overrides,
   };
 }
 
-function makeFolder(overrides: Partial<FeatureFolder> = {}): FeatureFolder {
+function makeFolder(overrides: Partial<ItemFolder> = {}): ItemFolder {
   return {
-    slug: "test-feature",
-    name: "Test Feature",
+    slug: "test-item",
+    name: "Test Item",
+    type: "feature",
     status: "open",
     goal: "Test goal",
     tasks: [],
-    source: "features/test-feature/index.md",
+    source: "items/test-item/index.md",
     ...overrides,
   };
 }
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
-    id: "test-feature/001",
+    id: "test-item/001",
     slug: "task-one",
     name: "Task One",
     status: "todo",
     priority: "001",
     owner: null,
-    featureId: "001",
+    itemId: "001",
     dependsOn: [],
     blocks: [],
     description: "A task",
     acceptanceCriteria: [],
-    source: "features/test-feature/001-task-one.md",
+    source: "items/test-item/001-task-one.md",
     ...overrides,
   };
 }
 
 describe("crossLink", () => {
-  it("links tasks to features via taskRefs", () => {
-    const feature = makeFeature();
-    const task1 = makeTask({ id: "test-feature/001", priority: "001" });
+  it("links tasks to items via taskRefs", () => {
+    const item = makeItem();
+    const task1 = makeTask({ id: "test-item/001", priority: "001" });
     const task2 = makeTask({
-      id: "test-feature/002",
+      id: "test-item/002",
       priority: "002",
       slug: "task-two",
       name: "Task Two",
     });
 
-    const result = crossLink([feature], [makeFolder()], [task1, task2]);
+    const result = crossLink([item], [makeFolder()], [task1, task2]);
 
-    expect(result.features[0].taskRefs).toEqual(["test-feature/001", "test-feature/002"]);
+    expect(result.items[0].taskRefs).toEqual(["test-item/001", "test-item/002"]);
     expect(result.errors).toHaveLength(0);
   });
 
-  it("errors when task references nonexistent feature", () => {
-    const task = makeTask({ featureId: "999" });
+  it("errors when task references nonexistent item", () => {
+    const task = makeTask({ itemId: "999" });
 
     const result = crossLink([], [], [task]);
 
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0].code).toBe("TASK_MISSING_FEATURE");
+    expect(result.errors[0].code).toBe("TASK_MISSING_ITEM");
     expect(result.errors[0].message).toContain("999");
   });
 
-  it("errors when feature references nonexistent folder", () => {
-    const feature = makeFeature({ featureSlug: "nonexistent" });
+  it("errors when item references nonexistent folder", () => {
+    const item = makeItem({ itemSlug: "nonexistent" });
 
-    const result = crossLink([feature], [], []);
+    const result = crossLink([item], [], []);
 
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0].code).toBe("FEATURE_MISSING_FOLDER");
+    expect(result.errors[0].code).toBe("ITEM_MISSING_FOLDER");
     expect(result.errors[0].message).toContain("nonexistent");
   });
 
-  it("does not error when featureSlug is null", () => {
-    const feature = makeFeature({ featureSlug: null });
+  it("does not error when itemSlug is null", () => {
+    const item = makeItem({ itemSlug: null });
 
-    const result = crossLink([feature], [], []);
+    const result = crossLink([item], [], []);
 
     expect(result.errors).toHaveLength(0);
   });
 
   describe("status derivation", () => {
     it("derives todo when all tasks are todo", () => {
-      const feature = makeFeature();
+      const item = makeItem();
       const task = makeTask({ status: "todo" });
 
-      const result = crossLink([feature], [makeFolder()], [task]);
+      const result = crossLink([item], [makeFolder()], [task]);
 
-      expect(result.features[0].statusDerived).toBe("todo");
+      expect(result.items[0].statusDerived).toBe("todo");
     });
 
     it("derives done when all tasks are done", () => {
-      const feature = makeFeature();
+      const item = makeItem();
       const task1 = makeTask({ status: "done" });
-      const task2 = makeTask({ id: "test-feature/002", status: "done" });
+      const task2 = makeTask({ id: "test-item/002", status: "done" });
 
-      const result = crossLink([feature], [makeFolder()], [task1, task2]);
+      const result = crossLink([item], [makeFolder()], [task1, task2]);
 
-      expect(result.features[0].statusDerived).toBe("done");
+      expect(result.items[0].statusDerived).toBe("done");
     });
 
     it("derives in-progress when any task is in-progress", () => {
-      const feature = makeFeature();
+      const item = makeItem();
       const task1 = makeTask({ status: "todo" });
-      const task2 = makeTask({ id: "test-feature/002", status: "in-progress" });
+      const task2 = makeTask({ id: "test-item/002", status: "in-progress" });
 
-      const result = crossLink([feature], [makeFolder()], [task1, task2]);
+      const result = crossLink([item], [makeFolder()], [task1, task2]);
 
-      expect(result.features[0].statusDerived).toBe("in-progress");
+      expect(result.items[0].statusDerived).toBe("in-progress");
     });
 
     it("derives in-progress when any task is ready-to-review", () => {
-      const feature = makeFeature();
+      const item = makeItem();
       const task = makeTask({ status: "ready-to-review" });
 
-      const result = crossLink([feature], [makeFolder()], [task]);
+      const result = crossLink([item], [makeFolder()], [task]);
 
-      expect(result.features[0].statusDerived).toBe("in-progress");
+      expect(result.items[0].statusDerived).toBe("in-progress");
     });
 
     it("derives in-progress when any task is ready-to-test", () => {
-      const feature = makeFeature();
+      const item = makeItem();
       const task = makeTask({ status: "ready-to-test" });
 
-      const result = crossLink([feature], [makeFolder()], [task]);
+      const result = crossLink([item], [makeFolder()], [task]);
 
-      expect(result.features[0].statusDerived).toBe("in-progress");
+      expect(result.items[0].statusDerived).toBe("in-progress");
     });
 
-    it("derives todo when feature has no tasks", () => {
-      const feature = makeFeature();
+    it("derives in-progress when mix of done and todo tasks", () => {
+      const item = makeItem();
+      const task1 = makeTask({ status: "done" });
+      const task2 = makeTask({ id: "test-item/002", status: "todo" });
 
-      const result = crossLink([feature], [makeFolder()], []);
+      const result = crossLink([item], [makeFolder()], [task1, task2]);
 
-      expect(result.features[0].statusDerived).toBe("todo");
+      expect(result.items[0].statusDerived).toBe("in-progress");
+    });
+
+    it("derives todo when item has no tasks", () => {
+      const item = makeItem();
+
+      const result = crossLink([item], [makeFolder()], []);
+
+      expect(result.items[0].statusDerived).toBe("todo");
     });
 
     it("warns when declared status differs from derived", () => {
-      const feature = makeFeature({ status: "todo" });
+      const item = makeItem({ status: "todo" });
       const task = makeTask({ status: "in-progress" });
 
-      const result = crossLink([feature], [makeFolder()], [task]);
+      const result = crossLink([item], [makeFolder()], [task]);
 
-      const warning = result.warnings.find((w) => w.code === "FEATURE_STATUS_MISMATCH");
+      const warning = result.warnings.find((w) => w.code === "ITEM_STATUS_MISMATCH");
       expect(warning).toBeDefined();
       expect(warning!.message).toContain("todo");
       expect(warning!.message).toContain("in-progress");
     });
 
     it("no warning when declared matches derived", () => {
-      const feature = makeFeature({ status: "in-progress" });
+      const item = makeItem({ status: "in-progress" });
       const task = makeTask({ status: "in-progress" });
 
-      const result = crossLink([feature], [makeFolder()], [task]);
+      const result = crossLink([item], [makeFolder()], [task]);
 
-      const warning = result.warnings.find((w) => w.code === "FEATURE_STATUS_MISMATCH");
+      const warning = result.warnings.find((w) => w.code === "ITEM_STATUS_MISMATCH");
       expect(warning).toBeUndefined();
     });
   });
 
   describe("table-vs-file consistency", () => {
     it("warns on status mismatch between table and file", () => {
-      const feature = makeFeature();
+      const item = makeItem();
       const folder = makeFolder({
         tasks: [
           {
@@ -187,7 +199,7 @@ describe("crossLink", () => {
       });
       const task = makeTask({ status: "in-progress" });
 
-      const result = crossLink([feature], [folder], [task]);
+      const result = crossLink([item], [folder], [task]);
 
       const warning = result.warnings.find((w) => w.code === "STATUS_MISMATCH");
       expect(warning).toBeDefined();
@@ -196,7 +208,7 @@ describe("crossLink", () => {
     });
 
     it("warns on owner mismatch between table and file", () => {
-      const feature = makeFeature();
+      const item = makeItem();
       const folder = makeFolder({
         tasks: [
           {
@@ -211,7 +223,7 @@ describe("crossLink", () => {
       });
       const task = makeTask({ owner: "@bob" });
 
-      const result = crossLink([feature], [folder], [task]);
+      const result = crossLink([item], [folder], [task]);
 
       const warning = result.warnings.find((w) => w.code === "OWNER_MISMATCH");
       expect(warning).toBeDefined();
@@ -241,7 +253,7 @@ describe("crossLink", () => {
     });
 
     it("no warnings when table and file are in sync", () => {
-      const feature = makeFeature();
+      const item = makeItem();
       const folder = makeFolder({
         tasks: [
           {
@@ -256,7 +268,7 @@ describe("crossLink", () => {
       });
       const task = makeTask({ status: "todo", owner: null });
 
-      const result = crossLink([feature], [folder], [task]);
+      const result = crossLink([item], [folder], [task]);
 
       const syncWarnings = result.warnings.filter(
         (w) => w.code === "STATUS_MISMATCH" || w.code === "OWNER_MISMATCH",

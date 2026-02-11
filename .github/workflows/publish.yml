@@ -1,0 +1,49 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Determine package from tag
+        id: pkg
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          if [[ "$TAG" == parser-v* ]]; then
+            echo "workspace=@backlogmd/parser" >> "$GITHUB_OUTPUT"
+          elif [[ "$TAG" == serve-v* ]]; then
+            echo "workspace=@backlogmd/serve" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Unknown tag prefix: $TAG (expected parser-v* or serve-v*)"
+            exit 1
+          fi
+
+      - name: Run tests
+        run: npm test -w ${{ steps.pkg.outputs.workspace }}
+
+      - name: Build
+        run: npm run build -w ${{ steps.pkg.outputs.workspace }}
+
+      - name: Publish
+        run: npm publish -w ${{ steps.pkg.outputs.workspace }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

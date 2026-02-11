@@ -23,7 +23,7 @@ const VALID_STATUSES: TaskStatus[] = [
 
 export function parseTaskFile(
   content: string,
-  featureSlug: string,
+  itemSlug: string,
   source: string,
 ): Task {
   const tree: Root = parseMd(content);
@@ -34,7 +34,7 @@ export function parseTaskFile(
   const status = parseStatus(metadata.get("Status"));
   const priority = metadata.get("Priority") ?? "";
   const owner = parseOwner(metadata.get("Owner"));
-  const featureId = parseFeatureId(metadata.get("Feature"), tree);
+  const itemId = parseItemId(metadata.get("Item"), tree);
   const dependsOn = parseLinkList(metadata.get("Depends on"), tree);
   const blocks = parseLinkList(metadata.get("Blocks"), tree);
 
@@ -42,7 +42,7 @@ export function parseTaskFile(
   const acceptanceCriteria = extractAcceptanceCriteria(tree);
 
   const slug = deriveSlug(source);
-  const id = `${featureSlug}/${priority}`;
+  const id = `${itemSlug}/${priority}`;
 
   return {
     id,
@@ -51,7 +51,7 @@ export function parseTaskFile(
     status,
     priority,
     owner,
-    featureId,
+    itemId,
     dependsOn,
     blocks,
     description,
@@ -144,11 +144,11 @@ function parseOwner(raw: string | undefined): string | null {
 }
 
 /**
- * Parse the Feature field to extract the feature id from the anchor link.
- * E.g., the link href "../../backlog.md#001---feature-name" -> "001"
+ * Parse the Item field to extract the item id from the anchor link.
+ * E.g., the link href "../../backlog.md#001---item-name" -> "001"
  */
-function parseFeatureId(raw: string | undefined, tree: Root): string {
-  // Walk the metadata list to find the Feature item's link
+function parseItemId(raw: string | undefined, tree: Root): string {
+  // Walk the metadata list to find the Item field's link
   const h1Index = tree.children.findIndex(
     (node) => node.type === "heading" && (node as Heading).depth === 1,
   );
@@ -171,7 +171,7 @@ function parseFeatureId(raw: string | undefined, tree: Root): string {
     );
     if (!strongNode) continue;
     const label = collectText(strongNode.children).replace(/:$/, "");
-    if (label !== "Feature") continue;
+    if (label !== "Item") continue;
 
     // Find a link node in this paragraph
     const linkNode = p.children.find((c): c is Link => c.type === "link");

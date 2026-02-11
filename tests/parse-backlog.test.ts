@@ -1,46 +1,50 @@
 import { describe, it, expect } from "vitest";
-import { parseBacklog } from "@backlogmd/parser";
+import { parseBacklog } from "../packages/parser/src/parse-backlog.js";
 
 const SOURCE = ".backlogmd/backlog.md";
 
-function makeBacklog(...featureBlocks: string[]): string {
+function makeBacklog(...itemBlocks: string[]): string {
   return `# Roadmap
 
-## Features
+## Items
 
-${featureBlocks.join("\n\n")}
+${itemBlocks.join("\n\n")}
 `;
 }
 
-function featureBlock(
+function itemBlock(
   id: string,
   name: string,
+  type: string,
   status: string,
-  feature: string,
+  item: string,
   description: string,
 ): string {
   return `### ${id} - ${name}
+- **Type:** ${type}
 - **Status:** ${status}
-- **Feature:** ${feature}
+- **Item:** ${item}
 - **Description:** ${description}`;
 }
 
 describe("parseBacklog", () => {
-  describe("multiple features parsed correctly", () => {
-    it("parses two well-formed features", () => {
+  describe("multiple items parsed correctly", () => {
+    it("parses two well-formed items", () => {
       const md = makeBacklog(
-        featureBlock(
+        itemBlock(
           "001",
           "User Authentication",
+          "feature",
           "todo",
-          "[User Authentication](features/user-auth/index.md)",
+          "[User Authentication](items/user-auth/index.md)",
           "Allow users to log in",
         ),
-        featureBlock(
+        itemBlock(
           "002",
           "Dashboard",
+          "bugfix",
           "done",
-          "[Dashboard](features/dashboard/index.md)",
+          "[Dashboard](items/dashboard/index.md)",
           "Main dashboard view",
         ),
       );
@@ -51,10 +55,11 @@ describe("parseBacklog", () => {
       expect(result[0]).toEqual({
         id: "001",
         name: "User Authentication",
+        type: "feature",
         status: "todo",
         statusDerived: null,
         taskRefs: [],
-        featureSlug: "user-auth",
+        itemSlug: "user-auth",
         description: "Allow users to log in",
         source: SOURCE,
       });
@@ -62,18 +67,43 @@ describe("parseBacklog", () => {
       expect(result[1]).toEqual({
         id: "002",
         name: "Dashboard",
+        type: "bugfix",
         status: "done",
         statusDerived: null,
         taskRefs: [],
-        featureSlug: "dashboard",
+        itemSlug: "dashboard",
         description: "Main dashboard view",
         source: SOURCE,
       });
     });
 
-    it("returns empty array when no ## Features section exists", () => {
+    it("returns empty array when no ## Items section exists", () => {
       const md = `# Roadmap\n\nSome content.\n`;
       expect(parseBacklog(md, SOURCE)).toEqual([]);
+    });
+  });
+
+  describe("type parsing", () => {
+    it.each([
+      ["feature", "feature"],
+      ["bugfix", "bugfix"],
+      ["refactor", "refactor"],
+      ["chore", "chore"],
+      ["Feature", "feature"],
+      ["BUGFIX", "bugfix"],
+    ] as const)("normalizes '%s' to '%s'", (input, expected) => {
+      const md = makeBacklog(
+        itemBlock("001", "Test Item", input, "todo", "[Test](items/test/index.md)", "A test"),
+      );
+      const result = parseBacklog(md, SOURCE);
+      expect(result[0].type).toBe(expected);
+    });
+
+    it("throws on unknown type", () => {
+      const md = makeBacklog(
+        itemBlock("001", "Test Item", "epic", "todo", "[Test](items/test/index.md)", "A test"),
+      );
+      expect(() => parseBacklog(md, SOURCE)).toThrow(/Unknown type.*"epic"/);
     });
   });
 
@@ -94,7 +124,7 @@ describe("parseBacklog", () => {
       ["WIP", "in-progress"],
     ] as const)("normalizes '%s' to '%s'", (input, expected) => {
       const md = makeBacklog(
-        featureBlock("001", "Test Feature", input, "[Test](features/test/index.md)", "A test"),
+        itemBlock("001", "Test Item", "feature", input, "[Test](items/test/index.md)", "A test"),
       );
       const result = parseBacklog(md, SOURCE);
       expect(result[0].status).toBe(expected);
@@ -102,84 +132,100 @@ describe("parseBacklog", () => {
 
     it("throws on unknown status", () => {
       const md = makeBacklog(
-        featureBlock("001", "Test Feature", "blocked", "[Test](features/test/index.md)", "A test"),
+        itemBlock("001", "Test Item", "feature", "blocked", "[Test](items/test/index.md)", "A test"),
       );
       expect(() => parseBacklog(md, SOURCE)).toThrow(/Unknown status.*"blocked"/);
     });
   });
 
-  describe("feature slug extraction", () => {
-    it("extracts slug from a valid feature link", () => {
+  describe("item slug extraction", () => {
+    it("extracts slug from a valid item link", () => {
       const md = makeBacklog(
-        featureBlock(
+        itemBlock(
           "001",
           "My Feature",
+          "feature",
           "todo",
-          "[My Feature](features/my-feature/index.md)",
+          "[My Feature](items/my-feature/index.md)",
           "Does things",
         ),
       );
       const result = parseBacklog(md, SOURCE);
-      expect(result[0].featureSlug).toBe("my-feature");
+      expect(result[0].itemSlug).toBe("my-feature");
     });
 
     it("handles hyphenated slugs", () => {
       const md = makeBacklog(
-        featureBlock(
+        itemBlock(
           "001",
           "Complex Feature Name",
+          "feature",
           "todo",
-          "[Complex Feature Name](features/complex-feature-name/index.md)",
+          "[Complex Feature Name](items/complex-feature-name/index.md)",
           "Does things",
         ),
       );
       const result = parseBacklog(md, SOURCE);
-      expect(result[0].featureSlug).toBe("complex-feature-name");
+      expect(result[0].itemSlug).toBe("complex-feature-name");
     });
   });
 
-  describe("em dash for no feature folder", () => {
-    it("returns null featureSlug for em dash", () => {
+  describe("em dash for no item folder", () => {
+    it("returns null itemSlug for em dash", () => {
       const md = makeBacklog(
-        featureBlock("001", "Planned Feature", "todo", "\u2014", "Not started yet"),
+        itemBlock("001", "Planned Feature", "feature", "todo", "\u2014", "Not started yet"),
       );
       const result = parseBacklog(md, SOURCE);
-      expect(result[0].featureSlug).toBeNull();
+      expect(result[0].itemSlug).toBeNull();
     });
   });
 
   describe("missing fields produce errors", () => {
+    it("throws when Type is missing", () => {
+      const md = makeBacklog(
+        `### 001 - Missing Type
+- **Status:** todo
+- **Item:** [Test](items/test/index.md)
+- **Description:** A test`,
+      );
+      expect(() => parseBacklog(md, SOURCE)).toThrow(/missing Type field/);
+    });
+
     it("throws when Status is missing", () => {
       const md = makeBacklog(
         `### 001 - Missing Status
-- **Feature:** [Test](features/test/index.md)
+- **Type:** feature
+- **Item:** [Test](items/test/index.md)
 - **Description:** A test`,
       );
       expect(() => parseBacklog(md, SOURCE)).toThrow(/missing Status field/);
     });
 
-    it("throws when Feature is missing", () => {
+    it("throws when Item is missing", () => {
       const md = makeBacklog(
-        `### 001 - Missing Feature
+        `### 001 - Missing Item
+- **Type:** feature
 - **Status:** todo
 - **Description:** A test`,
       );
-      expect(() => parseBacklog(md, SOURCE)).toThrow(/missing Feature field/);
+      expect(() => parseBacklog(md, SOURCE)).toThrow(/missing Item field/);
     });
 
     it("throws when Description is missing", () => {
       const md = makeBacklog(
         `### 001 - Missing Desc
+- **Type:** feature
 - **Status:** todo
-- **Feature:** [Test](features/test/index.md)`,
+- **Item:** [Test](items/test/index.md)`,
       );
       expect(() => parseBacklog(md, SOURCE)).toThrow(/missing Description field/);
     });
 
     it("collects multiple missing fields in one error", () => {
       const md = makeBacklog(`### 001 - All Missing`);
+      expect(() => parseBacklog(md, SOURCE)).toThrow(/missing Type field/);
       expect(() => parseBacklog(md, SOURCE)).toThrow(/missing Status field/);
-      expect(() => parseBacklog(md, SOURCE)).toThrow(/missing Feature field/);
+      expect(() => parseBacklog(md, SOURCE)).toThrow(/missing Item field/);
       expect(() => parseBacklog(md, SOURCE)).toThrow(/missing Description field/);
     });
   });
@@ -188,61 +234,65 @@ describe("parseBacklog", () => {
     it("errors on heading without NNN pattern", () => {
       const md = makeBacklog(
         `### No Number Here
+- **Type:** feature
 - **Status:** todo
-- **Feature:** [Test](features/test/index.md)
+- **Item:** [Test](items/test/index.md)
 - **Description:** A test`,
       );
-      expect(() => parseBacklog(md, SOURCE)).toThrow(/Malformed feature heading/);
+      expect(() => parseBacklog(md, SOURCE)).toThrow(/Malformed item heading/);
     });
 
     it("errors on heading with non-zero-padded number", () => {
       const md = makeBacklog(
         `### 1 - Short Number
+- **Type:** feature
 - **Status:** todo
-- **Feature:** [Test](features/test/index.md)
+- **Item:** [Test](items/test/index.md)
 - **Description:** A test`,
       );
-      expect(() => parseBacklog(md, SOURCE)).toThrow(/Malformed feature heading/);
+      expect(() => parseBacklog(md, SOURCE)).toThrow(/Malformed item heading/);
     });
 
     it("skips malformed heading but still parses valid ones after it", () => {
       const md = makeBacklog(
         `### Bad Heading`,
-        featureBlock("001", "Good Feature", "todo", "[Good](features/good/index.md)", "Works fine"),
+        itemBlock("001", "Good Feature", "feature", "todo", "[Good](items/good/index.md)", "Works fine"),
       );
-      // Both the malformed heading error and the good feature are processed;
+      // Both the malformed heading error and the good item are processed;
       // since there's an error, it throws
-      expect(() => parseBacklog(md, SOURCE)).toThrow(/Malformed feature heading/);
+      expect(() => parseBacklog(md, SOURCE)).toThrow(/Malformed item heading/);
     });
   });
 
   describe("source is passed through", () => {
-    it("attaches the source to each feature", () => {
+    it("attaches the source to each item", () => {
       const customSource = "path/to/my/backlog.md";
       const md = makeBacklog(
-        featureBlock("001", "Feature", "todo", "[Feature](features/feat/index.md)", "Desc"),
+        itemBlock("001", "Feature", "feature", "todo", "[Feature](items/feat/index.md)", "Desc"),
       );
       const result = parseBacklog(md, customSource);
       expect(result[0].source).toBe(customSource);
     });
   });
 
-  describe("features section boundary", () => {
+  describe("items section boundary", () => {
     it("stops parsing at the next h2 section", () => {
       const md = `# Roadmap
 
-## Features
+## Items
 
 ### 001 - First
+- **Type:** feature
 - **Status:** todo
-- **Feature:** [First](features/first/index.md)
-- **Description:** First feature
+- **Item:** [First](items/first/index.md)
+- **Description:** First item
 
 ## Other Section
 
 ### 002 - Should Not Parse
+- **Type:** feature
 - **Status:** done
-- **Feature:** [Second](features/second/index.md)
+- **Item:** [Second](items/second/index.md)
 - **Description:** Under different section
 `;
       const result = parseBacklog(md, SOURCE);

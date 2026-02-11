@@ -1,9 +1,10 @@
 {
   "protocol": "backlogmd/v1",
-  "features": [
+  "items": [
     {
       "id": "001",
       "name": "My Feature",
+      "type": "feature",
       "statusDeclared": "in-progress",
       "statusDerived": "in-progress",
       "slug": "my-feature",
@@ -12,14 +13,15 @@
       "source": "backlog.md"
     }
   ],
-  "featureFolders": [
+  "itemFolders": [
     {
       "slug": "my-feature",
       "name": "My Feature",
+      "type": "feature",
       "status": "open",
       "goal": "Validate the full parser pipeline end-to-end.",
       "tasks": ["001", "002"],
-      "source": "features/my-feature/index.md"
+      "source": "items/my-feature/index.md"
     }
   ],
   "tasks": [
@@ -30,7 +32,7 @@
       "status": "done",
       "priority": "001",
       "owner": "@alice",
-      "featureId": "001",
+      "itemId": "001",
       "dependsOn": [],
       "blocks": ["002 - Add login"],
       "description": "Bootstrap the project with all necessary tooling.",
@@ -38,7 +40,7 @@
         { "text": "Project compiles", "checked": true },
         { "text": "Tests pass", "checked": true }
       ],
-      "source": "features/my-feature/001-setup-project.md"
+      "source": "items/my-feature/001-setup-project.md"
     },
     {
       "id": "my-feature/002",
@@ -47,7 +49,7 @@
       "status": "in-progress",
       "priority": "002",
       "owner": "@bob",
-      "featureId": "001",
+      "itemId": "001",
       "dependsOn": ["001 - Setup project"],
       "blocks": [],
       "description": "Implement the login flow with email and password.",
@@ -56,7 +58,7 @@
         { "text": "Auth token is stored", "checked": false },
         { "text": "Redirect after login", "checked": false }
       ],
-      "source": "features/my-feature/002-add-login.md"
+      "source": "items/my-feature/002-add-login.md"
     }
   ],
   "validation": {

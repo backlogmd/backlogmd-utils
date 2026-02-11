@@ -3,6 +3,24 @@
   "version": "0.1.0",
   "description": "Parse BacklogMD markdown into canonical JSON",
   "type": "module",
+  "license": "MIT",
+  "author": "BacklogMD",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/backlogmd/backlogmd-utils.git",
+    "directory": "packages/parser"
+  },
+  "keywords": [
+    "backlogmd",
+    "backlog",
+    "markdown",
+    "parser",
+    "kanban",
+    "project-management"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -12,8 +30,13 @@
     },
     "./package.json": "./package.json"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "clean": "rm -rf dist",
     "build": "tsc",
+    "prepublishOnly": "npm run clean && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/",

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseMd } from "@backlogmd/parser";
+import { parseMd } from "../packages/parser/src/md.js";
 
 describe("smoke test", () => {
   it("parses a simple markdown heading", () => {

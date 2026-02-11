@@ -1,21 +1,21 @@
 import { Column } from "./Column";
 
-interface Feature {
+interface Item {
   name: string;
   description: string;
   status: string;
   statusDerived: string | null;
-  featureSlug: string | null;
+  itemSlug: string | null;
 }
 
-interface FeatureFolder {
+interface ItemFolder {
   slug: string;
   tasks: { status: string }[];
 }
 
 interface BacklogData {
-  features: Feature[];
-  featureFolders: FeatureFolder[];
+  items: Item[];
+  itemFolders: ItemFolder[];
 }
 
 const columns = [
@@ -25,16 +25,16 @@ const columns = [
 ] as const;
 
 export function Board({ data }: { data: BacklogData }) {
-  const byStatus: Record<string, Feature[]> = {
+  const byStatus: Record<string, Item[]> = {
     todo: [],
     "in-progress": [],
     done: [],
   };
 
-  for (const feature of data.features) {
-    const status = feature.statusDerived ?? feature.status;
+  for (const item of data.items) {
+    const status = item.statusDerived ?? item.status;
     if (byStatus[status]) {
-      byStatus[status].push(feature);
+      byStatus[status].push(item);
     }
   }
 
@@ -46,8 +46,8 @@ export function Board({ data }: { data: BacklogData }) {
           title={col.title}
           icon={col.icon}
           color={col.color}
-          features={byStatus[col.id]}
-          featureFolders={data.featureFolders}
+          items={byStatus[col.id]}
+          itemFolders={data.itemFolders}
         />
       ))}
     </div>

@@ -22,13 +22,14 @@ const mockOutput = {
   protocol: "backlogmd/v1",
   generatedAt: "2026-01-01T00:00:00.000Z",
   rootDir: "/test/.backlogmd",
-  features: [
+  items: [
     {
       id: "001",
       name: "User Auth",
+      type: "feature" as const,
       status: "in-progress" as const,
       statusDerived: "in-progress" as const,
-      featureSlug: "user-auth",
+      itemSlug: "user-auth",
       description: "Add user authentication",
       taskRefs: ["user-auth/001", "user-auth/002"],
       source: "backlog.md",
@@ -36,18 +37,20 @@ const mockOutput = {
     {
       id: "002",
       name: "Dashboard",
+      type: "feature" as const,
       status: "todo" as const,
       statusDerived: "todo" as const,
-      featureSlug: "dashboard",
+      itemSlug: "dashboard",
       description: "Build dashboard",
       taskRefs: [],
       source: "backlog.md",
     },
   ],
-  featureFolders: [
+  itemFolders: [
     {
       slug: "user-auth",
       name: "User Auth",
+      type: "feature" as const,
       status: "open" as const,
       goal: "Add user auth",
       tasks: [
@@ -68,7 +71,7 @@ const mockOutput = {
           dependsOn: ["001"],
         },
       ],
-      source: "features/user-auth/index.md",
+      source: "items/user-auth/index.md",
     },
   ],
   tasks: [],
@@ -84,14 +87,12 @@ describe("html", () => {
 
   it("injects valid JSON that round-trips correctly", () => {
     const html = renderHtml(mockOutput);
-    const match = html.match(
-      /<script>window\.__BACKLOG__=(.*?)<\/script>/,
-    );
+    const match = html.match(/<script>window\.__BACKLOG__=(.*?)<\/script>/);
     expect(match).not.toBeNull();
     const parsed = JSON.parse(match![1]);
     expect(parsed.protocol).toBe("backlogmd/v1");
-    expect(parsed.features).toHaveLength(2);
-    expect(parsed.features[0].name).toBe("User Auth");
+    expect(parsed.items).toHaveLength(2);
+    expect(parsed.items[0].name).toBe("User Auth");
   });
 
   it("preserves the rest of the HTML template", () => {
