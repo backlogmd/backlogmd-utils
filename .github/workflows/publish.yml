@@ -37,11 +37,11 @@ jobs:
             exit 1
           fi
 
-      - name: Run tests
-        run: npm test
-
       - name: Build
         run: npm run build -w ${{ steps.pkg.outputs.workspace }}
+
+      - name: Run tests
+        run: npm test
 
       - name: Publish
         run: npm publish -w ${{ steps.pkg.outputs.workspace }}
