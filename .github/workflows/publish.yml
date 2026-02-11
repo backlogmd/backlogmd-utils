@@ -37,7 +37,10 @@ jobs:
             exit 1
           fi
 
-      - name: Build
+      - name: Build parser (needed by all packages)
+        run: npm run build -w @backlogmd/parser
+
+      - name: Build target package
         run: npm run build -w ${{ steps.pkg.outputs.workspace }}
 
       - name: Run tests
