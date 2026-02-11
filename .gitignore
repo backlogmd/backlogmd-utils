@@ -1,0 +1,17 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Vite
+packages/serve/app/dist/
+
+# OS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+
+# Environment
+.env
+.env.*

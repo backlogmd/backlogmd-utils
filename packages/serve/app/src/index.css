@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-col-todo: #f8fafc;
+  --color-col-inprogress: #eff6ff;
+  --color-col-done: #f0fdf4;
+  --color-badge-todo-bg: #f1f5f9;
+  --color-badge-todo-text: #475569;
+  --color-badge-wip-bg: #dbeafe;
+  --color-badge-wip-text: #1e40af;
+  --color-badge-done-bg: #dcfce7;
+  --color-badge-done-text: #166534;
+  --color-progress: #3b82f6;
+  --color-progress-track: #e2e8f0;
+}
