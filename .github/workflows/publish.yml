@@ -38,7 +38,7 @@ jobs:
           fi
 
       - name: Run tests
-        run: npm test -w ${{ steps.pkg.outputs.workspace }}
+        run: npm test
 
       - name: Build
         run: npm run build -w ${{ steps.pkg.outputs.workspace }}
