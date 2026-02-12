@@ -1,6 +1,14 @@
 # backlogmd-utils
 
-Monorepo for [BacklogMD](https://github.com/backlogmd/backlogmd) — a markdown-based project management tool. Manage your backlog as plain `.md` files and get a live kanban dashboard that watches your changes in real time.
+Monorepo for [BacklogMD](https://github.com/backlogmd/backlogmd), a markdown-based project management tool for agentic development.
+
+Manage your backlog as plain `.md` files directly in your repo. No SaaS. No lock-in. No hidden state. Just versioned work items you fully control.
+
+BacklogMD also gives you a live Kanban dashboard that watches your markdown files and updates in real time.
+
+It doubles as a transparency layer for your coding agents. You can see exactly what they are working on, what is next, and what has been completed, all through Git.
+
+If backlog files become noisy, simply add them to `.gitignore` and keep your repository clean.
 
 ## Quick start
 
