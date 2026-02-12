@@ -1,0 +1,2 @@
+- [001-extract-type-from-slug](001-extract-type-from-slug.md)
+- [002-render-type-badge](002-render-type-badge.md)

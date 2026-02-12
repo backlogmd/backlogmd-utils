@@ -11,6 +11,10 @@ describe("parseBacklog (SPEC v2)", () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
         slug: "001-feat-user-auth",
+<<<<<<< HEAD
+=======
+        type: "feat",
+>>>>>>> 8c17d17 (v0.2)
         source: SOURCE,
       });
     });
@@ -23,8 +27,16 @@ describe("parseBacklog (SPEC v2)", () => {
       const result = parseBacklog(md, SOURCE);
       expect(result).toHaveLength(3);
       expect(result[0].slug).toBe("001-feat-user-auth");
+<<<<<<< HEAD
       expect(result[1].slug).toBe("002-fix-dashboard");
       expect(result[2].slug).toBe("003-chore-cleanup");
+=======
+      expect(result[0].type).toBe("feat");
+      expect(result[1].slug).toBe("002-fix-dashboard");
+      expect(result[1].type).toBe("fix");
+      expect(result[2].slug).toBe("003-chore-cleanup");
+      expect(result[2].type).toBe("chore");
+>>>>>>> 8c17d17 (v0.2)
     });
 
     it("returns empty array for empty content", () => {
@@ -47,6 +59,10 @@ describe("parseBacklog (SPEC v2)", () => {
       const md = `- [001-project-foundation](work/001-project-foundation/index.md)\n`;
       const result = parseBacklog(md, SOURCE);
       expect(result[0].slug).toBe("001-project-foundation");
+<<<<<<< HEAD
+=======
+      expect(result[0].type).toBeNull();
+>>>>>>> 8c17d17 (v0.2)
     });
 
     it("falls back to link text if URL pattern doesn't match", () => {

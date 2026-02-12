@@ -5,6 +5,10 @@ import type { BacklogEntry, ItemFolder, Task } from "@backlogmd/parser";
 function makeEntry(overrides: Partial<BacklogEntry> = {}): BacklogEntry {
   return {
     slug: "001-feat-test",
+<<<<<<< HEAD
+=======
+    type: "feat",
+>>>>>>> 8c17d17 (v0.2)
     source: "backlog.md",
     ...overrides,
   };
@@ -13,6 +17,10 @@ function makeEntry(overrides: Partial<BacklogEntry> = {}): BacklogEntry {
 function makeFolder(overrides: Partial<ItemFolder> = {}): ItemFolder {
   return {
     slug: "001-feat-test",
+<<<<<<< HEAD
+=======
+    type: "feat",
+>>>>>>> 8c17d17 (v0.2)
     tasks: [],
     source: "work/001-feat-test/index.md",
     ...overrides,
