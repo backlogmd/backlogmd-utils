@@ -51,6 +51,7 @@
     "format:check": "prettier --check 'src/**/*.ts'"
   },
   "dependencies": {
+    "@backlogmd/types": "*",
     "@backlogmd/parser": "*"
   },
   "devDependencies": {

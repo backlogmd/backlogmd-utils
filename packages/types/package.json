@@ -1,0 +1,45 @@
+{
+  "name": "@backlogmd/types",
+  "version": "0.1.0",
+  "description": "Shared types and protocol helpers for BacklogMD",
+  "type": "module",
+  "license": "MIT",
+  "author": "BacklogMD",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/backlogmd/backlogmd-utils.git",
+    "directory": "packages/types"
+  },
+  "keywords": [
+    "backlogmd",
+    "backlog",
+    "types",
+    "typescript"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

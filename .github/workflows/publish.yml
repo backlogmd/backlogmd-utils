@@ -28,20 +28,30 @@ jobs:
         id: pkg
         run: |
           TAG="${{ github.event.release.tag_name }}"
-          if [[ "$TAG" == parser-v* ]]; then
+          if [[ "$TAG" == types-v* ]]; then
+            echo "workspace=@backlogmd/types" >> "$GITHUB_OUTPUT"
+          elif [[ "$TAG" == parser-v* ]]; then
             echo "workspace=@backlogmd/parser" >> "$GITHUB_OUTPUT"
+          elif [[ "$TAG" == writer-v* ]]; then
+            echo "workspace=@backlogmd/writer" >> "$GITHUB_OUTPUT"
           elif [[ "$TAG" == serve-v* ]]; then
             echo "workspace=@backlogmd/serve" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::Unknown tag prefix: $TAG (expected parser-v* or serve-v*)"
+            echo "::error::Unknown tag prefix: $TAG (expected types-v*, parser-v*, writer-v*, or serve-v*)"
             exit 1
           fi
 
-      - name: Build parser (needed by all packages)
+      - name: Build types
+        run: npm run build -w @backlogmd/types
+
+      - name: Build parser
         run: npm run build -w @backlogmd/parser
 
-      - name: Build target package
-        run: npm run build -w ${{ steps.pkg.outputs.workspace }}
+      - name: Build writer
+        run: npm run build -w @backlogmd/writer
+
+      - name: Build serve
+        run: npm run build -w @backlogmd/serve
 
       - name: Run tests
         run: npm test

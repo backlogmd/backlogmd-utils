@@ -1,20 +1,20 @@
 {
-  "name": "@backlogmd/parser",
+  "name": "@backlogmd/writer",
   "version": "0.1.0",
-  "description": "Parse BacklogMD markdown into canonical JSON",
+  "description": "Surgical markdown writer for BacklogMD — virtual DOM for your backlog",
   "type": "module",
   "license": "MIT",
   "author": "BacklogMD",
   "repository": {
     "type": "git",
     "url": "https://github.com/backlogmd/backlogmd-utils.git",
-    "directory": "packages/parser"
+    "directory": "packages/writer"
   },
   "keywords": [
     "backlogmd",
     "backlog",
     "markdown",
-    "parser",
+    "writer",
     "kanban",
     "project-management"
   ],
@@ -45,18 +45,11 @@
   },
   "dependencies": {
     "@backlogmd/types": "*",
-    "remark-gfm": "^4.0.0",
-    "remark-parse": "^11.0.0",
-    "unified": "^11.0.5"
+    "@backlogmd/parser": "*"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
-    "@types/mdast": "^4.0.4",
     "@types/node": "^22.0.0",
-    "eslint": "^9.0.0",
-    "prettier": "^3.4.0",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.0.0",
     "vitest": "^3.0.0"
   },
   "engines": {

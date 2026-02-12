@@ -1,29 +1,15 @@
 import type {
   RoadmapItem,
   ItemFolder,
-  ItemStatus,
   Task,
   ValidationIssue,
 } from "./types.js";
+import { deriveItemStatus } from "@backlogmd/types";
 
 export interface CrossLinkResult {
   items: RoadmapItem[];
   errors: ValidationIssue[];
   warnings: ValidationIssue[];
-}
-
-/**
- * Derive an item's status from its tasks per protocol:
- * - All tasks done → done
- * - Any task in-progress / ready-to-review / ready-to-test → in-progress
- * - Mix of done and todo tasks → in-progress
- * - All tasks todo → todo
- */
-function deriveItemStatus(tasks: Task[]): ItemStatus {
-  if (tasks.length === 0) return "todo";
-  if (tasks.every((t) => t.status === "done")) return "done";
-  if (tasks.every((t) => t.status === "todo")) return "todo";
-  return "in-progress";
 }
 
 /**
@@ -156,7 +142,7 @@ export function crossLink(
   // 4. Derive item status from tasks
   for (const item of items) {
     const itemTasks = tasks.filter((t) => t.itemId === item.id);
-    item.statusDerived = deriveItemStatus(itemTasks);
+    item.statusDerived = deriveItemStatus(itemTasks.map((t) => t.status));
 
     if (item.status !== item.statusDerived) {
       warnings.push({
