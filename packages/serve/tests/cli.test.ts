@@ -5,7 +5,7 @@ describe("cli parseArgs", () => {
   it("returns defaults when no arguments given", () => {
     const args = parseArgs([]);
     expect(args.dir).toContain(".backlogmd");
-    expect(args.port).toBe(3000);
+    expect(args.port).toBe(3030);
     expect(args.host).toBe("localhost");
     expect(args.help).toBe(false);
   });
