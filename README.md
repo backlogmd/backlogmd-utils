@@ -5,7 +5,7 @@ Monorepo for [BacklogMD](https://github.com/backlogmd/backlogmd) — a markdown-
 ## Quick start
 
 ```bash
-npx @backlogmd/serve --dir .backlogmd
+npx @backlogmd/serve --dir your-project-repo/.backlogmd
 ```
 
 This starts a local dashboard at `http://localhost:3030` that reads your `.backlogmd/` directory, renders a kanban board, and **watches for file changes** — every time you edit a markdown file, the board updates automatically via Server-Sent Events.
