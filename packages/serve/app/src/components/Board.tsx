@@ -59,7 +59,11 @@ const columns = [
   { id: "done", title: "Done", color: "bg-col-done", icon: "●" },
 ] as const;
 
+<<<<<<< HEAD
 export function Board({ data }: { data: BacklogData }) {
+=======
+export function Board({ data, searchQuery = "" }: { data: BacklogData; searchQuery?: string }) {
+>>>>>>> 8c17d17 (v0.2)
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Build display items from entries + items + tasks
@@ -78,13 +82,26 @@ export function Board({ data }: { data: BacklogData }) {
     });
   }
 
+<<<<<<< HEAD
+=======
+  // Filter by search query
+  const query = searchQuery.trim().toLowerCase();
+  const filtered = query
+    ? displayItems.filter((item) => item.name.toLowerCase().includes(query))
+    : displayItems;
+
+>>>>>>> 8c17d17 (v0.2)
   const byStatus: Record<string, DisplayItem[]> = {
     open: [],
     "in-progress": [],
     done: [],
   };
 
+<<<<<<< HEAD
   for (const item of displayItems) {
+=======
+  for (const item of filtered) {
+>>>>>>> 8c17d17 (v0.2)
     if (byStatus[item.status]) {
       byStatus[item.status].push(item);
     }
@@ -110,10 +127,14 @@ export function Board({ data }: { data: BacklogData }) {
         ))}
       </div>
       {showAddModal && (
+<<<<<<< HEAD
         <AddWorkModal
           onClose={() => setShowAddModal(false)}
           onSubmit={handleAddWork}
         />
+=======
+        <AddWorkModal onClose={() => setShowAddModal(false)} onSubmit={handleAddWork} />
+>>>>>>> 8c17d17 (v0.2)
       )}
     </>
   );

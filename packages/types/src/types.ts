@@ -11,6 +11,15 @@ export type TaskStatus = "open" | "block" | "in-progress" | "done";
  * Not stored in files — backlog.md and index.md have no status fields in SPEC v2.
  */
 export type ItemStatus = "open" | "in-progress" | "done";
+<<<<<<< HEAD
+=======
+
+/**
+ * Conventional Commits type extracted from an item slug.
+ * Optional — slugs without a type segment are valid.
+ */
+export type ItemType = "feat" | "fix" | "refactor" | "chore";
+>>>>>>> 8c17d17 (v0.2)
 
 // ─── Model interfaces ───────────────────────────────────────────────
 
@@ -22,6 +31,11 @@ export type ItemStatus = "open" | "in-progress" | "done";
 export interface BacklogEntry {
   /** The item slug, e.g. "001-feat-project-foundation" */
   slug: string;
+<<<<<<< HEAD
+=======
+  /** Conventional Commits type extracted from the slug, or null if absent */
+  type: ItemType | null;
+>>>>>>> 8c17d17 (v0.2)
   /** Source file path relative to .backlogmd/ */
   source: string;
 }
@@ -34,6 +48,11 @@ export interface BacklogEntry {
 export interface ItemFolder {
   /** The item slug (matches directory name) */
   slug: string;
+<<<<<<< HEAD
+=======
+  /** Conventional Commits type extracted from the slug, or null if absent */
+  type: ItemType | null;
+>>>>>>> 8c17d17 (v0.2)
   /** Task references parsed from the bullet list */
   tasks: TaskRef[];
   /** Source file path relative to .backlogmd/ */

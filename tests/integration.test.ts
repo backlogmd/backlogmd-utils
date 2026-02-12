@@ -11,9 +11,16 @@ describe("integration: happy-path fixture (SPEC v2)", () => {
     expect(output.protocol).toBe("backlogmd/v2");
   });
 
+<<<<<<< HEAD
   it("parses one backlog entry", () => {
     expect(output.entries).toHaveLength(1);
     expect(output.entries[0].slug).toBe("001-feat-my-feature");
+=======
+  it("parses one backlog entry with type", () => {
+    expect(output.entries).toHaveLength(1);
+    expect(output.entries[0].slug).toBe("001-feat-my-feature");
+    expect(output.entries[0].type).toBe("feat");
+>>>>>>> 8c17d17 (v0.2)
   });
 
   it("parses one item folder with two task refs", () => {
@@ -21,6 +28,10 @@ describe("integration: happy-path fixture (SPEC v2)", () => {
 
     const item = output.items[0];
     expect(item.slug).toBe("001-feat-my-feature");
+<<<<<<< HEAD
+=======
+    expect(item.type).toBe("feat");
+>>>>>>> 8c17d17 (v0.2)
     expect(item.tasks).toHaveLength(2);
     expect(item.tasks[0].slug).toBe("001-setup-project");
     expect(item.tasks[1].slug).toBe("002-add-login");
