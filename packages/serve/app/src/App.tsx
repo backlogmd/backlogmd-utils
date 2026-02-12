@@ -33,12 +33,12 @@ export function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <NotificationBanner errors={errors} warnings={warnings} />
         {data ? (
           <Board data={data as any} searchQuery={searchQuery} />
         ) : (
           <p className="text-slate-400 text-sm">Loading...</p>
         )}
+        <NotificationBanner errors={errors} warnings={warnings} />
       </main>
     </div>
   );
