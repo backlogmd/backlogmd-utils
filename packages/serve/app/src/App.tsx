@@ -5,10 +5,7 @@ import { NotificationBanner } from "./components/NotificationBanner";
 
 export function App() {
   const { data, connected, errors, warnings } = useBacklog();
-<<<<<<< HEAD
-=======
   const [searchQuery, setSearchQuery] = useState("");
->>>>>>> 8c17d17 (v0.2)
 
   return (
     <div className="bg-slate-50 min-h-screen">

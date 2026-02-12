@@ -1,10 +1,7 @@
 import type { List, ListItem, Link, PhrasingContent } from "mdast";
 import { parseMd } from "./md.js";
 import type { ItemFolder, TaskRef } from "./types.js";
-<<<<<<< HEAD
-=======
 import { parseItemType } from "./parse-slug.js";
->>>>>>> 8c17d17 (v0.2)
 
 /**
  * Extract the plain text from phrasing content nodes.
@@ -67,9 +64,5 @@ export function parseItemIndex(
     }
   }
 
-<<<<<<< HEAD
-  return { slug, tasks, source };
-=======
   return { slug, type: parseItemType(slug), tasks, source };
->>>>>>> 8c17d17 (v0.2)
 }

@@ -11,10 +11,7 @@ describe("parseItemIndex (SPEC v2)", () => {
     const result = parseItemIndex(md, "001-feat-user-auth", "work/001-feat-user-auth/index.md");
 
     expect(result.slug).toBe("001-feat-user-auth");
-<<<<<<< HEAD
-=======
     expect(result.type).toBe("feat");
->>>>>>> 8c17d17 (v0.2)
     expect(result.source).toBe("work/001-feat-user-auth/index.md");
     expect(result.tasks).toHaveLength(3);
 
@@ -45,18 +42,11 @@ describe("parseItemIndex (SPEC v2)", () => {
     expect(result.tasks).toEqual([]);
   });
 
-<<<<<<< HEAD
-  it("preserves slug and source", () => {
-    const md = `- [001-task](001-task.md)\n`;
-    const result = parseItemIndex(md, "my-item", "work/my-item/index.md");
-    expect(result.slug).toBe("my-item");
-=======
   it("preserves slug, type, and source", () => {
     const md = `- [001-task](001-task.md)\n`;
     const result = parseItemIndex(md, "my-item", "work/my-item/index.md");
     expect(result.slug).toBe("my-item");
     expect(result.type).toBeNull();
->>>>>>> 8c17d17 (v0.2)
     expect(result.source).toBe("work/my-item/index.md");
   });
 

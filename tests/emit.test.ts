@@ -28,13 +28,8 @@ describe("serializeOutput (SPEC v2)", () => {
   it("serializes entries as simple slug objects", () => {
     const output = makeOutput({
       entries: [
-<<<<<<< HEAD
-        { slug: "001-feat-auth", source: "backlog.md" },
-        { slug: "002-fix-dashboard", source: "backlog.md" },
-=======
         { slug: "001-feat-auth", type: "feat", source: "backlog.md" },
         { slug: "002-fix-dashboard", type: "fix", source: "backlog.md" },
->>>>>>> 8c17d17 (v0.2)
       ],
     });
 
@@ -49,10 +44,7 @@ describe("serializeOutput (SPEC v2)", () => {
       items: [
         {
           slug: "001-feat-auth",
-<<<<<<< HEAD
-=======
           type: "feat",
->>>>>>> 8c17d17 (v0.2)
           tasks: [
             { slug: "001-setup", fileName: "001-setup.md" },
             { slug: "002-login", fileName: "002-login.md" },
@@ -115,11 +107,7 @@ describe("serializeOutput (SPEC v2)", () => {
 
   it("output is valid UTF-8 JSON", () => {
     const output = makeOutput({
-<<<<<<< HEAD
-      entries: [{ slug: "001-feat-ünïcödé", source: "backlog.md" }],
-=======
       entries: [{ slug: "001-feat-ünïcödé", type: "feat", source: "backlog.md" }],
->>>>>>> 8c17d17 (v0.2)
     });
 
     const json = serializeOutput(output);
