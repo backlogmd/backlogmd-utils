@@ -22,16 +22,17 @@ function copyDirSync(src: string, dest: string): void {
 }
 
 // The happy-path fixture has:
-//   - Item 001 "My Feature" with status "in-progress"
-//   - Task 001 "Setup project" status=done, owner=@alice
-//   - Task 002 "Add login" status=in-progress, owner=@bob
+//   - Entry: 001-feat-my-feature
+//   - Item folder: work/001-feat-my-feature/ with two tasks
+//   - Task 001 "Setup project" status=done
+//   - Task 002 "Add login" status=in-progress
 const FIXTURE_SRC = path.resolve(
   __dirname,
   "../../..",
   "tests/fixtures/happy-path",
 );
 
-describe("BacklogDocument", () => {
+describe("BacklogDocument (SPEC v2)", () => {
   let tmpDir: string;
 
   beforeEach(() => {
@@ -46,74 +47,64 @@ describe("BacklogDocument", () => {
 
   it("loads the fixture and exposes the model", async () => {
     const doc = await BacklogDocument.load(tmpDir);
-    expect(doc.model.protocol).toBe("backlogmd/v1");
-    expect(doc.model.items).toHaveLength(1);
+    expect(doc.model.protocol).toBe("backlogmd/v2");
+    expect(doc.model.entries).toHaveLength(1);
     expect(doc.model.tasks).toHaveLength(2);
   });
 
   // ─── changeTaskStatus: task 002 in-progress → done ────────────────
 
   describe("changeTaskStatus: mark task 002 as done", () => {
-    it("returns 3 patches (task file, index table, backlog.md)", async () => {
+    it("returns 1 patch (task file only, no table/backlog in SPEC v2)", async () => {
       const doc = await BacklogDocument.load(tmpDir);
-      const changeset = doc.changeTaskStatus("my-feature/002", "done");
-
-      // Should produce patches for:
-      // 1. Task file (002-add-login.md) status: in-progress → done
-      // 2. Index table row 002 status: in-progress → done
-      // 3. Backlog.md item status: in-progress → done (since both tasks now done)
-      expect(changeset.patches).toHaveLength(3);
-
-      const taskPatch = changeset.patches.find((p) =>
-        p.filePath.endsWith("002-add-login.md"),
+      const changeset = doc.changeTaskStatus(
+        "work/001-feat-my-feature/002-add-login.md",
+        "done",
       );
-      expect(taskPatch).toBeDefined();
-      expect(taskPatch!.description).toContain("in-progress → done");
 
-      const indexPatch = changeset.patches.find((p) =>
-        p.filePath.endsWith("index.md"),
-      );
-      expect(indexPatch).toBeDefined();
+      // SPEC v2: only the task file needs patching (no table, no backlog status)
+      expect(changeset.patches).toHaveLength(1);
 
-      const backlogPatch = changeset.patches.find(
-        (p) => p.filePath === "backlog.md",
-      );
-      expect(backlogPatch).toBeDefined();
-      expect(backlogPatch!.description).toContain("in-progress → done");
+      const taskPatch = changeset.patches[0];
+      expect(taskPatch.filePath).toBe("work/001-feat-my-feature/002-add-login.md");
+      expect(taskPatch.description).toContain("in-progress → done");
     });
 
-    it("modelAfter reflects the updated statuses", async () => {
+    it("modelAfter reflects the updated status", async () => {
       const doc = await BacklogDocument.load(tmpDir);
-      const changeset = doc.changeTaskStatus("my-feature/002", "done");
+      const changeset = doc.changeTaskStatus(
+        "work/001-feat-my-feature/002-add-login.md",
+        "done",
+      );
 
-      // Task should be updated
       const task = changeset.modelAfter.tasks.find(
-        (t) => t.id === "my-feature/002",
+        (t) => t.source === "work/001-feat-my-feature/002-add-login.md",
       );
       expect(task!.status).toBe("done");
-
-      // Item should be derived as done (both tasks now done)
-      const item = changeset.modelAfter.items[0];
-      expect(item.status).toBe("done");
-      expect(item.statusDerived).toBe("done");
-
-      // Item folder task stub should be updated
-      const folder = changeset.modelAfter.itemFolders[0];
-      const stub = folder.tasks.find((t) => t.priority === "002");
-      expect(stub!.status).toBe("done");
     });
 
     it("modelBefore is unchanged", async () => {
       const doc = await BacklogDocument.load(tmpDir);
-      const changeset = doc.changeTaskStatus("my-feature/002", "done");
+      const changeset = doc.changeTaskStatus(
+        "work/001-feat-my-feature/002-add-login.md",
+        "done",
+      );
 
       const task = changeset.modelBefore.tasks.find(
-        (t) => t.id === "my-feature/002",
+        (t) => t.source === "work/001-feat-my-feature/002-add-login.md",
       );
       expect(task!.status).toBe("in-progress");
+    });
+  });
 
-      const item = changeset.modelBefore.items[0];
-      expect(item.status).toBe("in-progress");
+  // ─── changeTaskStatus: using itemSlug/priority format ──────────────
+
+  describe("changeTaskStatus: itemSlug/priority format", () => {
+    it("accepts itemSlug/priority as task identifier", async () => {
+      const doc = await BacklogDocument.load(tmpDir);
+      const changeset = doc.changeTaskStatus("001-feat-my-feature/002", "done");
+
+      expect(changeset.patches).toHaveLength(1);
     });
   });
 
@@ -122,31 +113,12 @@ describe("BacklogDocument", () => {
   describe("changeTaskStatus: no-op", () => {
     it("returns empty changeset when task already has target status", async () => {
       const doc = await BacklogDocument.load(tmpDir);
-      const changeset = doc.changeTaskStatus("my-feature/001", "done");
+      const changeset = doc.changeTaskStatus(
+        "work/001-feat-my-feature/001-setup-project.md",
+        "done",
+      );
 
       expect(changeset.patches).toHaveLength(0);
-    });
-  });
-
-  // ─── changeTaskStatus: no backlog.md patch when item status unchanged
-
-  describe("changeTaskStatus: partial cascade (no backlog.md change)", () => {
-    it("returns 2 patches when item status does not change", async () => {
-      const doc = await BacklogDocument.load(tmpDir);
-      // Changing task 002 from in-progress to ready-to-review
-      // Item derived status stays "in-progress" (task 001=done, task 002=ready-to-review → in-progress)
-      const changeset = doc.changeTaskStatus(
-        "my-feature/002",
-        "ready-to-review",
-      );
-
-      expect(changeset.patches).toHaveLength(2);
-
-      // No backlog.md patch
-      const backlogPatch = changeset.patches.find(
-        (p) => p.filePath === "backlog.md",
-      );
-      expect(backlogPatch).toBeUndefined();
     });
   });
 
@@ -166,7 +138,10 @@ describe("BacklogDocument", () => {
   describe("commit", () => {
     it("writes patches to disk and re-parsing produces consistent model", async () => {
       const doc = await BacklogDocument.load(tmpDir);
-      const changeset = doc.changeTaskStatus("my-feature/002", "done");
+      const changeset = doc.changeTaskStatus(
+        "work/001-feat-my-feature/002-add-login.md",
+        "done",
+      );
 
       await doc.commit(changeset);
 
@@ -174,54 +149,41 @@ describe("BacklogDocument", () => {
       const reparsed = buildBacklogOutput(tmpDir);
 
       // Task 002 should now be "done"
-      const task002 = reparsed.tasks.find((t) => t.id === "my-feature/002");
+      const task002 = reparsed.tasks.find((t) => t.priority === "002");
       expect(task002!.status).toBe("done");
-
-      // Item should derive as "done"
-      expect(reparsed.items[0].statusDerived).toBe("done");
-      expect(reparsed.items[0].status).toBe("done");
-
-      // Item folder task stub should also be "done"
-      const stub = reparsed.itemFolders[0].tasks.find(
-        (t) => t.priority === "002",
-      );
-      expect(stub!.status).toBe("done");
-
-      // No validation warnings about status mismatches
-      const statusMismatches = reparsed.validation.warnings.filter(
-        (w) =>
-          w.code === "STATUS_MISMATCH" ||
-          w.code === "ITEM_STATUS_MISMATCH",
-      );
-      expect(statusMismatches).toHaveLength(0);
     });
 
     it("updates the document model after commit", async () => {
       const doc = await BacklogDocument.load(tmpDir);
-      const changeset = doc.changeTaskStatus("my-feature/002", "done");
+      const changeset = doc.changeTaskStatus(
+        "work/001-feat-my-feature/002-add-login.md",
+        "done",
+      );
 
       await doc.commit(changeset);
 
-      // The document's internal model should now reflect the change
-      const task = doc.model.tasks.find((t) => t.id === "my-feature/002");
+      const task = doc.model.tasks.find(
+        (t) => t.source === "work/001-feat-my-feature/002-add-login.md",
+      );
       expect(task!.status).toBe("done");
     });
 
     it("does nothing when changeset has no patches", async () => {
       const doc = await BacklogDocument.load(tmpDir);
-      const changeset = doc.changeTaskStatus("my-feature/001", "done");
+      const changeset = doc.changeTaskStatus(
+        "work/001-feat-my-feature/001-setup-project.md",
+        "done",
+      );
 
-      // Read original file before commit
       const beforeContent = fs.readFileSync(
-        path.join(tmpDir, "items/my-feature/001-setup-project.md"),
+        path.join(tmpDir, "work/001-feat-my-feature/001-setup-project.md"),
         "utf-8",
       );
 
       await doc.commit(changeset);
 
-      // File should be unchanged
       const afterContent = fs.readFileSync(
-        path.join(tmpDir, "items/my-feature/001-setup-project.md"),
+        path.join(tmpDir, "work/001-feat-my-feature/001-setup-project.md"),
         "utf-8",
       );
       expect(afterContent).toBe(beforeContent);
@@ -229,48 +191,23 @@ describe("BacklogDocument", () => {
 
     it("verifies surgical edits preserve surrounding content", async () => {
       const doc = await BacklogDocument.load(tmpDir);
-      const changeset = doc.changeTaskStatus("my-feature/002", "done");
+      const changeset = doc.changeTaskStatus(
+        "work/001-feat-my-feature/002-add-login.md",
+        "done",
+      );
 
       await doc.commit(changeset);
 
-      // Read the task file and verify non-status content is preserved
       const taskContent = fs.readFileSync(
-        path.join(tmpDir, "items/my-feature/002-add-login.md"),
+        path.join(tmpDir, "work/001-feat-my-feature/002-add-login.md"),
         "utf-8",
       );
-      expect(taskContent).toContain("# Add login");
-      expect(taskContent).toContain("- **Status:** done");
-      expect(taskContent).toContain("- **Priority:** 002");
-      expect(taskContent).toContain("- **Owner:** @bob");
+      expect(taskContent).toContain("Task: Add login");
+      expect(taskContent).toContain("Status: done");
+      expect(taskContent).toContain("Priority: 002");
       expect(taskContent).toContain("## Description");
-      expect(taskContent).toContain("## Acceptance Criteria");
+      expect(taskContent).toContain("## Acceptance criteria");
       expect(taskContent).toContain("- [x] Login form renders");
-
-      // Read backlog.md and verify structure is preserved
-      const backlogContent = fs.readFileSync(
-        path.join(tmpDir, "backlog.md"),
-        "utf-8",
-      );
-      expect(backlogContent).toContain("# Roadmap");
-      expect(backlogContent).toContain("## Items");
-      expect(backlogContent).toContain("### 001 - My Feature");
-      expect(backlogContent).toContain("- **Type:** feature");
-      expect(backlogContent).toContain("- **Status:** done");
-
-      // Read index.md and verify table structure is preserved
-      const indexContent = fs.readFileSync(
-        path.join(tmpDir, "items/my-feature/index.md"),
-        "utf-8",
-      );
-      expect(indexContent).toContain("# My Feature");
-      expect(indexContent).toContain(
-        "| # | Task | Status | Owner | Depends on |",
-      );
-      // Row 001 should still have its original values
-      const lines = indexContent.split("\n");
-      const row001 = lines.find((l) => l.includes("| 001 |"));
-      expect(row001).toContain("done");
-      expect(row001).toContain("@alice");
     });
   });
 });

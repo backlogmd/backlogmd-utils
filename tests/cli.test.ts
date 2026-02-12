@@ -95,7 +95,7 @@ describe("run", () => {
     expect(code).toBe(0);
     expect(logOutput.length).toBeGreaterThan(0);
     const json = JSON.parse(logOutput.join("\n"));
-    expect(json.protocol).toBe("backlogmd/v1");
+    expect(json.protocol).toBe("backlogmd/v2");
   });
 
   it("returns 1 on unknown argument", async () => {

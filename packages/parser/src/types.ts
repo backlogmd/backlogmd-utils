@@ -6,13 +6,11 @@
  * "@backlogmd/parser", both of which resolve to @backlogmd/types.
  */
 export type {
-  ItemType,
   ItemStatus,
-  ItemFolderStatus,
   TaskStatus,
-  RoadmapItem,
+  BacklogEntry,
   ItemFolder,
-  TaskStub,
+  TaskRef,
   Task,
   AcceptanceCriterion,
   ValidationIssue,

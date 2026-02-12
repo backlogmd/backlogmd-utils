@@ -1,13 +1,12 @@
 import type {
-  RoadmapItem,
+  BacklogEntry,
   ItemFolder,
   Task,
   ValidationIssue,
 } from "./types.js";
-import { deriveItemStatus } from "@backlogmd/types";
 
 export interface CrossLinkResult {
-  items: RoadmapItem[];
+  entries: BacklogEntry[];
   errors: ValidationIssue[];
   warnings: ValidationIssue[];
 }
@@ -17,39 +16,45 @@ export interface CrossLinkResult {
  * Returns a list of cycles found (each as an array of task IDs).
  */
 function detectCycles(tasks: Task[]): string[][] {
-  const taskMap = new Map<string, Task>();
+  // Build a map of task source → task for dependency resolution
+  const taskByKey = new Map<string, Task>();
   for (const t of tasks) {
-    taskMap.set(t.id, t);
+    // Key by itemSlug/priority (unique within the backlog)
+    taskByKey.set(`${t.itemSlug}/${t.priority}`, t);
   }
 
   const visited = new Set<string>();
   const inStack = new Set<string>();
   const cycles: string[][] = [];
 
-  function dfs(taskId: string, path: string[]): void {
-    if (inStack.has(taskId)) {
-      const cycleStart = path.indexOf(taskId);
-      cycles.push(path.slice(cycleStart).concat(taskId));
+  function dfs(key: string, path: string[]): void {
+    if (inStack.has(key)) {
+      const cycleStart = path.indexOf(key);
+      cycles.push(path.slice(cycleStart).concat(key));
       return;
     }
-    if (visited.has(taskId)) return;
+    if (visited.has(key)) return;
 
-    visited.add(taskId);
-    inStack.add(taskId);
+    visited.add(key);
+    inStack.add(key);
 
-    const task = taskMap.get(taskId);
+    const task = taskByKey.get(key);
     if (task) {
       for (const dep of task.dependsOn) {
-        dfs(dep, [...path, taskId]);
+        // Try to resolve dependency to a task key
+        const depKey = resolveDepKey(dep, task.itemSlug, taskByKey);
+        if (depKey) {
+          dfs(depKey, [...path, key]);
+        }
       }
     }
 
-    inStack.delete(taskId);
+    inStack.delete(key);
   }
 
-  for (const t of tasks) {
-    if (!visited.has(t.id)) {
-      dfs(t.id, []);
+  for (const key of taskByKey.keys()) {
+    if (!visited.has(key)) {
+      dfs(key, []);
     }
   }
 
@@ -57,111 +62,100 @@ function detectCycles(tasks: Task[]): string[][] {
 }
 
 /**
- * Build cross-references between items and tasks, derive item statuses,
- * and validate consistency between item index tables and task files.
+ * Try to resolve a dependency string to a task key.
+ */
+function resolveDepKey(
+  dep: string,
+  currentItemSlug: string,
+  taskByKey: Map<string, Task>,
+): string | null {
+  // If dep looks like a slug (e.g. "001-setup"), try to match within the same item
+  for (const [key, task] of taskByKey) {
+    if (task.itemSlug === currentItemSlug && task.slug === dep) return key;
+    if (task.itemSlug === currentItemSlug && task.priority === dep) return key;
+    if (key === dep) return key;
+  }
+  return null;
+}
+
+/**
+ * Build cross-references and validate consistency.
+ *
+ * In SPEC v2, the backlog and index files are simple link lists.
+ * Validation checks:
+ * 1. Each backlog entry has a matching item folder
+ * 2. Each item folder's task refs have matching task files
+ * 3. Task dependency graph has no cycles
  */
 export function crossLink(
-  items: RoadmapItem[],
+  entries: BacklogEntry[],
   itemFolders: ItemFolder[],
   tasks: Task[],
 ): CrossLinkResult {
   const errors: ValidationIssue[] = [];
   const warnings: ValidationIssue[] = [];
 
-  const itemMap = new Map<string, RoadmapItem>();
-  for (const item of items) {
-    itemMap.set(item.id, item);
-  }
-
   const folderMap = new Map<string, ItemFolder>();
   for (const folder of itemFolders) {
     folderMap.set(folder.slug, folder);
   }
 
-  // 1. Link tasks to items and build task refs
-  for (const task of tasks) {
-    const item = itemMap.get(task.itemId);
-    if (!item) {
+  // 1. Validate backlog entries have matching item folders
+  for (const entry of entries) {
+    if (!folderMap.has(entry.slug)) {
       errors.push({
-        code: "TASK_MISSING_ITEM",
-        message: `Task "${task.name}" (${task.id}) references item ${task.itemId} which does not exist in the roadmap`,
-        source: task.source,
+        code: "ENTRY_MISSING_FOLDER",
+        message: `Backlog entry "${entry.slug}" has no matching item folder in work/`,
+        source: entry.source,
       });
-      continue;
-    }
-    item.taskRefs.push(task.id);
-  }
-
-  // 2. Validate item folder references
-  for (const item of items) {
-    if (item.itemSlug) {
-      const folder = folderMap.get(item.itemSlug);
-      if (!folder) {
-        errors.push({
-          code: "ITEM_MISSING_FOLDER",
-          message: `Item ${item.id} ("${item.name}") references folder "${item.itemSlug}" which does not exist`,
-          source: item.source,
-        });
-      }
     }
   }
 
-  // 3. Validate table-vs-file consistency
+  // 2. Warn about orphan item folders (in work/ but not in backlog.md)
+  const entrySlugSet = new Set(entries.map((e) => e.slug));
   for (const folder of itemFolders) {
-    for (const stub of folder.tasks) {
-      const taskId = `${folder.slug}/${stub.priority}`;
-      const task = tasks.find((t) => t.id === taskId);
+    if (!entrySlugSet.has(folder.slug)) {
+      warnings.push({
+        code: "ORPHAN_FOLDER",
+        message: `Item folder "${folder.slug}" exists in work/ but is not listed in backlog.md`,
+        source: folder.source,
+      });
+    }
+  }
 
-      if (!task) {
+  // 3. Validate task refs have matching task files
+  const tasksByItem = new Map<string, Task[]>();
+  for (const task of tasks) {
+    const existing = tasksByItem.get(task.itemSlug) ?? [];
+    existing.push(task);
+    tasksByItem.set(task.itemSlug, existing);
+  }
+
+  for (const folder of itemFolders) {
+    const itemTasks = tasksByItem.get(folder.slug) ?? [];
+    const taskFileSet = new Set(itemTasks.map((t) => t.source));
+
+    for (const ref of folder.tasks) {
+      const expectedSource = `work/${folder.slug}/${ref.fileName}`;
+      if (!taskFileSet.has(expectedSource)) {
         warnings.push({
-          code: "TABLE_TASK_MISSING_FILE",
-          message: `Item "${folder.name}" task table references task ${stub.priority} ("${stub.name}") but no task file was found`,
+          code: "INDEX_TASK_MISSING_FILE",
+          message: `Item "${folder.slug}" index references "${ref.fileName}" but no matching task file was found`,
           source: folder.source,
         });
-        continue;
-      }
-
-      if (stub.status !== task.status) {
-        warnings.push({
-          code: "STATUS_MISMATCH",
-          message: `Task ${task.id} ("${task.name}"): table says "${stub.status}" but file says "${task.status}"`,
-          source: task.source,
-        });
-      }
-
-      if (stub.owner !== task.owner) {
-        warnings.push({
-          code: "OWNER_MISMATCH",
-          message: `Task ${task.id} ("${task.name}"): table says owner "${stub.owner ?? "—"}" but file says "${task.owner ?? "—"}"`,
-          source: task.source,
-        });
       }
     }
   }
 
-  // 4. Derive item status from tasks
-  for (const item of items) {
-    const itemTasks = tasks.filter((t) => t.itemId === item.id);
-    item.statusDerived = deriveItemStatus(itemTasks.map((t) => t.status));
-
-    if (item.status !== item.statusDerived) {
-      warnings.push({
-        code: "ITEM_STATUS_MISMATCH",
-        message: `Item ${item.id} ("${item.name}"): declared status "${item.status}" but derived status is "${item.statusDerived}"`,
-        source: item.source,
-      });
-    }
-  }
-
-  // 5. Validate task dependency graph for cycles
+  // 4. Validate task dependency graph for cycles
   const cycles = detectCycles(tasks);
   for (const cycle of cycles) {
     errors.push({
       code: "CIRCULAR_DEPENDENCY",
       message: `Circular dependency detected: ${cycle.join(" → ")}`,
-      source: tasks.find((t) => t.id === cycle[0])?.source ?? "",
+      source: tasks.find((t) => `${t.itemSlug}/${t.priority}` === cycle[0])?.source ?? "",
     });
   }
 
-  return { items, errors, warnings };
+  return { entries, errors, warnings };
 }

@@ -1,17 +1,19 @@
 const colorMap: Record<string, string> = {
-  todo: "bg-badge-todo-bg text-badge-todo-text",
+  open: "bg-badge-todo-bg text-badge-todo-text",
+  block: "bg-red-100 text-red-700",
   "in-progress": "bg-badge-wip-bg text-badge-wip-text",
   done: "bg-badge-done-bg text-badge-done-text",
 };
 
 const labelMap: Record<string, string> = {
-  todo: "To Do",
+  open: "Open",
+  block: "Blocked",
   "in-progress": "In Progress",
   done: "Done",
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const colors = colorMap[status] ?? colorMap.todo;
+  const colors = colorMap[status] ?? colorMap.open;
   const label = labelMap[status] ?? status;
   return (
     <span

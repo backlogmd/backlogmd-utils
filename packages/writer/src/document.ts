@@ -3,16 +3,11 @@ import path from "node:path";
 import {
   type BacklogOutput,
   type TaskStatus,
-  type ItemStatus,
-  deriveItemStatus,
 } from "@backlogmd/types";
 import { buildBacklogOutput } from "@backlogmd/parser";
 import type { Changeset, FileCache, FilePatch } from "./types.js";
-import { patchMetadataField, patchTableCell } from "./patch.js";
+import { patchMetadataField } from "./patch.js";
 import { applyChangeset } from "./apply.js";
-
-/** Column index of the Status cell in item index task tables (0-based) */
-const TABLE_STATUS_COL = 2;
 
 /**
  * BacklogDocument — a virtual DOM for the .backlogmd/ directory.
@@ -20,6 +15,10 @@ const TABLE_STATUS_COL = 2;
  * Load the backlog from disk, apply mutations that cascade through
  * related files, inspect the resulting patches, and commit them
  * back to disk as surgical edits.
+ *
+ * SPEC v2: Task metadata lives in fenced code blocks inside HTML
+ * comment sections. Item index and backlog files are simple bullet
+ * lists with no metadata to patch.
  */
 export class BacklogDocument {
   private _model: BacklogOutput;
@@ -54,7 +53,7 @@ export class BacklogDocument {
     filePaths.add("backlog.md");
 
     // item index files
-    for (const folder of model.itemFolders) {
+    for (const folder of model.items) {
       filePaths.add(folder.source);
     }
 
@@ -88,20 +87,28 @@ export class BacklogDocument {
    *
    * Returns a Changeset that can be inspected (dry-run) or committed.
    *
-   * Cascade:
-   * 1. Patch the task file's `- **Status:**` line
-   * 2. Patch the item index table's Status cell for this task
-   * 3. If the item's derived status changed, patch backlog.md's `- **Status:**` line
+   * SPEC v2 cascade:
+   * 1. Patch the task file's metadata code block Status field
    *
-   * @param taskId    - The task ID, e.g. "my-feature/003"
+   * In SPEC v2, item index (index.md) is a simple bullet list with no
+   * status column, and backlog.md has no status field — so no cascade
+   * beyond the task file itself. Item status is derived at read time.
+   *
+   * @param taskId    - The task source path, e.g. "work/my-feature/003-task.md",
+   *                    or "itemSlug/priority" format, e.g. "my-feature/003"
    * @param newStatus - The new task status
    * @returns A Changeset with all patches and model snapshots
    *
    * @throws If the task is not found
-   * @throws If the task already has the target status (no-op error)
    */
   changeTaskStatus(taskId: string, newStatus: TaskStatus): Changeset {
-    const task = this._model.tasks.find((t) => t.id === taskId);
+    // Find the task by source path or itemSlug/priority
+    const task = this._model.tasks.find(
+      (t) =>
+        t.source === taskId ||
+        `${t.itemSlug}/${t.priority}` === taskId,
+    );
+
     if (!task) {
       throw new Error(`Task "${taskId}" not found in the model`);
     }
@@ -133,83 +140,11 @@ export class BacklogDocument {
       description: `task status: ${oldStatus} → ${newStatus}`,
     });
 
-    // Update model: task
-    const modelTask = modelAfter.tasks.find((t) => t.id === taskId)!;
+    // Update model: task status
+    const modelTask = modelAfter.tasks.find(
+      (t) => t.source === task.source,
+    )!;
     modelTask.status = newStatus;
-
-    // --- 2. Patch the item index table ---
-    const itemSlug = taskId.split("/")[0];
-    const folder = this._model.itemFolders.find((f) => f.slug === itemSlug);
-
-    if (folder) {
-      const indexContent = this._cache.get(folder.source);
-      if (indexContent) {
-        const tablePatch = patchTableCell(
-          indexContent,
-          task.priority,
-          TABLE_STATUS_COL,
-          newStatus,
-        );
-        patches.push({
-          filePath: folder.source,
-          original: tablePatch.original,
-          replacement: tablePatch.replacement,
-          description: `index table task ${task.priority} status: ${oldStatus} → ${newStatus}`,
-        });
-
-        // Update model: item folder task stub
-        const modelFolder = modelAfter.itemFolders.find(
-          (f) => f.slug === itemSlug,
-        )!;
-        const stub = modelFolder.tasks.find(
-          (t) => t.priority === task.priority,
-        );
-        if (stub) {
-          stub.status = newStatus;
-        }
-      }
-    }
-
-    // --- 3. Check if item's derived status changed → patch backlog.md ---
-    const item = this._model.items.find((i) => i.itemSlug === itemSlug);
-    if (item) {
-      // Compute the new derived status using all tasks for this item
-      const allTaskStatuses = modelAfter.tasks
-        .filter((t) => t.itemId === item.id)
-        .map((t) => t.status);
-
-      const newDerivedStatus: ItemStatus = deriveItemStatus(allTaskStatuses);
-      const oldDerivedStatus: ItemStatus =
-        item.statusDerived ?? item.status;
-
-      if (newDerivedStatus !== oldDerivedStatus) {
-        const backlogContent = this._cache.get("backlog.md");
-        if (backlogContent) {
-          // backlog.md has multiple items — we need to patch the right one.
-          // Each item section starts with ### and has its own Status field.
-          // We locate the section for this item and patch within it.
-          const sectionPatch = patchItemStatusInBacklog(
-            backlogContent,
-            item.id,
-            item.name,
-            newDerivedStatus,
-          );
-          patches.push({
-            filePath: "backlog.md",
-            original: sectionPatch.original,
-            replacement: sectionPatch.replacement,
-            description: `item "${item.name}" status: ${oldDerivedStatus} → ${newDerivedStatus}`,
-          });
-        }
-
-        // Update model: roadmap item
-        const modelItem = modelAfter.items.find(
-          (i) => i.itemSlug === itemSlug,
-        )!;
-        modelItem.status = newDerivedStatus;
-        modelItem.statusDerived = newDerivedStatus;
-      }
-    }
 
     return {
       patches,
@@ -232,58 +167,4 @@ export class BacklogDocument {
     // Update internal model to the post-mutation state
     this._model = changeset.modelAfter;
   }
-}
-
-/**
- * Patch the Status field for a specific item section in backlog.md.
- *
- * backlog.md contains multiple item sections like:
- *   ### 001 - Item Name
- *   - **Type:** feature
- *   - **Status:** todo
- *
- * We need to find the right section by item ID and patch only its Status line.
- */
-function patchItemStatusInBacklog(
-  content: string,
-  itemId: string,
-  itemName: string,
-  newStatus: ItemStatus,
-): { original: string; replacement: string } {
-  // Find the section header for this item: ### 001 - Item Name
-  const escapedId = itemId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const sectionPattern = new RegExp(
-    `^### ${escapedId} - .+$`,
-    "m",
-  );
-  const sectionMatch = content.match(sectionPattern);
-  if (!sectionMatch || sectionMatch.index === undefined) {
-    throw new Error(
-      `Item section "### ${itemId} - ${itemName}" not found in backlog.md`,
-    );
-  }
-
-  // Extract the section text (from the header to the next ### or end of file)
-  const sectionStart = sectionMatch.index;
-  const restAfterHeader = content.slice(sectionStart + sectionMatch[0].length);
-  const nextSectionMatch = restAfterHeader.match(/^### /m);
-  const sectionEnd = nextSectionMatch?.index !== undefined
-    ? sectionStart + sectionMatch[0].length + nextSectionMatch.index
-    : content.length;
-
-  const sectionText = content.slice(sectionStart, sectionEnd);
-
-  // Patch the Status field within this section
-  const statusPattern = /^(- \*\*Status:\*\*\s+).+$/m;
-  const statusMatch = sectionText.match(statusPattern);
-  if (!statusMatch) {
-    throw new Error(
-      `Status field not found in item "${itemName}" section of backlog.md`,
-    );
-  }
-
-  const original = statusMatch[0];
-  const replacement = `${statusMatch[1]}${newStatus}`;
-
-  return { original, replacement };
 }

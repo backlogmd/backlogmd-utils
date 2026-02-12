@@ -1,58 +1,79 @@
 // ─── Enums / Union types ─────────────────────────────────────────────
 
-export type ItemType = "feature" | "bugfix" | "refactor" | "chore";
+/**
+ * Valid task statuses per SPEC v2.
+ * Flow: open → in-progress → done. Use "block" when a task is blocked.
+ */
+export type TaskStatus = "open" | "block" | "in-progress" | "done";
 
-export type ItemStatus = "todo" | "in-progress" | "done";
-
-export type ItemFolderStatus = "open" | "archived";
-
-export type TaskStatus = "todo" | "in-progress" | "ready-to-review" | "ready-to-test" | "done";
+/**
+ * Derived item status, computed from its tasks.
+ * Not stored in files — backlog.md and index.md have no status fields in SPEC v2.
+ */
+export type ItemStatus = "open" | "in-progress" | "done";
 
 // ─── Model interfaces ───────────────────────────────────────────────
 
-export interface RoadmapItem {
-  id: string;
-  name: string;
-  type: ItemType;
-  status: ItemStatus;
-  statusDerived: ItemStatus | null;
-  itemSlug: string | null;
-  description: string;
-  taskRefs: string[];
+/**
+ * A backlog entry parsed from backlog.md.
+ *
+ * SPEC v2 format: `- [<item-slug>](work/<item-slug>/index.md)`
+ */
+export interface BacklogEntry {
+  /** The item slug, e.g. "001-feat-project-foundation" */
+  slug: string;
+  /** Source file path relative to .backlogmd/ */
   source: string;
 }
 
+/**
+ * An item folder parsed from work/<slug>/index.md.
+ *
+ * SPEC v2 format: bullet list of task file links.
+ */
 export interface ItemFolder {
+  /** The item slug (matches directory name) */
   slug: string;
-  name: string;
-  type: ItemType;
-  status: ItemFolderStatus;
-  goal: string;
-  tasks: TaskStub[];
+  /** Task references parsed from the bullet list */
+  tasks: TaskRef[];
+  /** Source file path relative to .backlogmd/ */
   source: string;
 }
 
-export interface TaskStub {
-  priority: string;
-  name: string;
+/**
+ * A task reference from an item's index.md bullet list.
+ */
+export interface TaskRef {
+  /** Task slug from link text, e.g. "001-task-slug" */
+  slug: string;
+  /** File name from link URL, e.g. "001-task-slug.md" */
   fileName: string;
-  status: TaskStatus;
-  owner: string | null;
-  dependsOn: string[];
 }
 
+/**
+ * A full task parsed from its markdown file.
+ *
+ * SPEC v2 task format uses HTML comment sections with a fenced code block
+ * for metadata (Task, Status, Priority, DependsOn).
+ */
 export interface Task {
-  id: string;
-  slug: string;
+  /** Task name from the metadata block */
   name: string;
+  /** Current task status */
   status: TaskStatus;
+  /** Priority number, e.g. "001" */
   priority: string;
-  owner: string | null;
-  itemId: string;
+  /** Task slug derived from filename */
+  slug: string;
+  /** Parent item slug */
+  itemSlug: string;
+  /** Dependency task slugs or relative paths */
   dependsOn: string[];
-  blocks: string[];
+  /** Description content from the DESCRIPTION section */
   description: string;
+  /** Acceptance criteria checkboxes */
   acceptanceCriteria: AcceptanceCriterion[];
+  /** Source file path relative to .backlogmd/ */
   source: string;
 }
 
@@ -67,13 +88,23 @@ export interface ValidationIssue {
   source: string;
 }
 
+/**
+ * The canonical output of the backlog parser.
+ */
 export interface BacklogOutput {
+  /** Protocol version identifier */
   protocol: string;
+  /** ISO timestamp of generation */
   generatedAt: string;
+  /** Absolute path to the .backlogmd/ directory */
   rootDir: string;
-  items: RoadmapItem[];
-  itemFolders: ItemFolder[];
+  /** Backlog entries from backlog.md (ordered by priority) */
+  entries: BacklogEntry[];
+  /** Item folders from work/ */
+  items: ItemFolder[];
+  /** All tasks parsed from task files */
   tasks: Task[];
+  /** Validation results */
   validation: {
     errors: ValidationIssue[];
     warnings: ValidationIssue[];

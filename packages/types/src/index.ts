@@ -1,17 +1,12 @@
 // Model types
 export type {
-  ItemType,
-  ItemStatus,
-  ItemFolderStatus,
   TaskStatus,
-  RoadmapItem,
+  ItemStatus,
+  BacklogEntry,
   ItemFolder,
-  TaskStub,
+  TaskRef,
   Task,
   AcceptanceCriterion,
   ValidationIssue,
   BacklogOutput,
 } from "./types.js";
-
-// Protocol helpers
-export { deriveItemStatus } from "./derive.js";
