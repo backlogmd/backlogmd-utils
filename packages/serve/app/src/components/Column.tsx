@@ -7,12 +7,14 @@ export function Column({
   color,
   items,
   onAdd,
+  onItemSelect,
 }: {
   title: string;
   icon: string;
   color: string;
   items: DisplayItem[];
   onAdd?: () => void;
+  onItemSelect: (item: DisplayItem) => void;
 }) {
   return (
     <section className={`${color} rounded-xl p-5 min-h-48`}>
@@ -37,7 +39,11 @@ export function Column({
           <p className="text-slate-400 text-sm py-4 text-center">No items</p>
         ) : (
           items.map((item) => (
-            <ItemCard key={item.slug} item={item} />
+            <ItemCard
+              key={item.slug}
+              item={item}
+              onClick={() => onItemSelect(item)}
+            />
           ))
         )}
       </div>

@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Column } from "./Column";
 import { AddWorkModal } from "./AddWorkModal";
+import { ItemDetailModal } from "./ItemDetailModal";
+import { useTaskStatusUpdate } from "../hooks/useTaskStatusUpdate";
 
 interface TaskRef {
   slug: string;
@@ -68,6 +70,8 @@ const columns = [
 
 export function Board({ data, searchQuery = "" }: { data: BacklogData; searchQuery?: string }) {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<DisplayItem | null>(null);
+  const { updateTaskStatus, pendingTasks } = useTaskStatusUpdate();
 
   // Build display items from entries + items + tasks
   const displayItems: DisplayItem[] = [];
@@ -85,6 +89,19 @@ export function Board({ data, searchQuery = "" }: { data: BacklogData; searchQue
       tasks: itemTasks,
     });
   }
+
+  // Keep modal in sync when data refreshes via SSE
+  useEffect(() => {
+    if (selectedItem) {
+      const fresh = displayItems.find((item) => item.slug === selectedItem.slug);
+      if (fresh) {
+        setSelectedItem(fresh);
+      } else {
+        // Item no longer exists — close modal
+        setSelectedItem(null);
+      }
+    }
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Filter by search query
   const query = searchQuery.trim().toLowerCase();
@@ -120,11 +137,20 @@ export function Board({ data, searchQuery = "" }: { data: BacklogData; searchQue
             color={col.color}
             items={byStatus[col.id]}
             onAdd={col.id === "open" ? () => setShowAddModal(true) : undefined}
+            onItemSelect={setSelectedItem}
           />
         ))}
       </div>
       {showAddModal && (
         <AddWorkModal onClose={() => setShowAddModal(false)} onSubmit={handleAddWork} />
+      )}
+      {selectedItem && (
+        <ItemDetailModal
+          item={selectedItem}
+          onClose={() => setSelectedItem(null)}
+          onTaskStatusChange={updateTaskStatus}
+          pendingTasks={pendingTasks}
+        />
       )}
     </>
   );

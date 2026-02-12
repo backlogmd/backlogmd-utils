@@ -6,7 +6,15 @@ import {
 } from "node:http";
 import { renderHtml } from "./html.js";
 import { buildBacklogOutput } from "@backlogmd/parser";
-import type { BacklogOutput } from "@backlogmd/types";
+import type { BacklogOutput, TaskStatus } from "@backlogmd/types";
+import { BacklogDocument } from "@backlogmd/writer";
+
+const VALID_STATUSES: Set<string> = new Set([
+  "open",
+  "block",
+  "in-progress",
+  "done",
+]);
 
 export interface ServerResult {
   server: Server;
@@ -39,10 +47,24 @@ function errorOutput(backlogDir: string, err: Error): BacklogOutput {
   };
 }
 
+/**
+ * Read the full request body as a string.
+ */
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk: Buffer) => {
+      body += chunk.toString();
+    });
+    req.on("end", () => resolve(body));
+    req.on("error", reject);
+  });
+}
+
 export function createServer(port: number, backlogDir: string): ServerResult {
   const clients = new Set<ServerResponse>();
 
-  const requestHandler = (req: IncomingMessage, res: ServerResponse) => {
+  const requestHandler = async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url || "/", `http://localhost:${port}`);
 
     if (url.pathname === "/" || url.pathname === "/index.html") {
@@ -83,6 +105,74 @@ export function createServer(port: number, backlogDir: string): ServerResult {
 
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(output));
+      return;
+    }
+
+    // PATCH /api/tasks/<encoded-source> — update a task's status
+    if (req.method === "PATCH" && url.pathname.startsWith("/api/tasks/")) {
+      const encodedSource = url.pathname.slice("/api/tasks/".length);
+      const taskSource = decodeURIComponent(encodedSource);
+
+      if (!taskSource) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing task source" }));
+        return;
+      }
+
+      let body: string;
+      try {
+        body = await readBody(req);
+      } catch {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Failed to read request body" }));
+        return;
+      }
+
+      let parsed: { status?: string };
+      try {
+        parsed = JSON.parse(body);
+      } catch {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid JSON" }));
+        return;
+      }
+
+      const newStatus = parsed.status;
+      if (!newStatus || !VALID_STATUSES.has(newStatus)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            error: `Invalid status "${newStatus}". Must be one of: ${[...VALID_STATUSES].join(", ")}`,
+          }),
+        );
+        return;
+      }
+
+      try {
+        const doc = await BacklogDocument.load(backlogDir);
+        const changeset = doc.changeTaskStatus(
+          taskSource,
+          newStatus as TaskStatus,
+        );
+        await doc.commit(changeset);
+
+        // Notify all SSE clients to refresh
+        notifyClients();
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (err) {
+        const message = (err as Error).message;
+        // If the task is not found, return 404
+        if (message.includes("not found")) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: message }));
+        } else {
+          console.error("[backlogmd-serve] PATCH error:", message);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: message }));
+        }
+      }
       return;
     }
 
