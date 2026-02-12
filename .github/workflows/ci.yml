@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build types
+        run: npm run build -w @backlogmd/types
+
+      - name: Build parser
+        run: npm run build -w @backlogmd/parser
+
+      - name: Build writer
+        run: npm run build -w @backlogmd/writer
+
+      - name: Build serve
+        run: npm run build -w @backlogmd/serve
+
+      - name: Run tests
+        run: npm test
