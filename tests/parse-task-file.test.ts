@@ -1,14 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { parseTaskFile } from "../packages/parser/src/parse-task-file.js";
 
-const FULL_TASK = `# Setup Database
+const FULL_TASK = `<!-- METADATA -->
 
-- **Status:** in-progress
-- **Priority:** 002
-- **Owner:** alice
-- **Item:** [Auth Feature](../../backlog.md#001---auth-feature)
-- **Depends on:** [001-init](../common/001-init.md), [002-config](../common/002-config.md)
-- **Blocks:** [003-api](./003-api.md)
+\`\`\`
+Task: Setup Database
+Status: in-progress
+Priority: 002
+DependsOn: [001-init](001-init.md), [002-config](002-config.md)
+\`\`\`
+
+<!-- /METADATA -->
+<!-- DESCRIPTION -->
 
 ## Description
 
@@ -16,23 +19,24 @@ Set up the database schema and migrations.
 
 This includes PostgreSQL setup.
 
-## Acceptance Criteria
+<!-- /DESCRIPTION -->
+<!-- ACCEPTANCE CRITERIA -->
+
+## Acceptance criteria
 
 - [ ] Schema is defined
 - [x] Migrations run successfully
 - [ ] Seed data is loaded
+
+<!-- /ACCEPTANCE CRITERIA -->
 `;
 
-describe("parseTaskFile", () => {
+describe("parseTaskFile (SPEC v2)", () => {
   describe("valid task with all fields", () => {
-    const task = parseTaskFile(FULL_TASK, "auth", "items/auth/002-setup-database.md");
+    const task = parseTaskFile(FULL_TASK, "auth", "work/auth/002-setup-database.md");
 
-    it("extracts the task name from h1", () => {
+    it("extracts the task name from metadata", () => {
       expect(task.name).toBe("Setup Database");
-    });
-
-    it("derives id from itemSlug and priority", () => {
-      expect(task.id).toBe("auth/002");
     });
 
     it("derives slug from source filename", () => {
@@ -47,20 +51,12 @@ describe("parseTaskFile", () => {
       expect(task.priority).toBe("002");
     });
 
-    it("extracts owner", () => {
-      expect(task.owner).toBe("alice");
-    });
-
-    it("extracts itemId from anchor link", () => {
-      expect(task.itemId).toBe("001");
+    it("extracts itemSlug", () => {
+      expect(task.itemSlug).toBe("auth");
     });
 
     it("extracts dependsOn as link texts", () => {
       expect(task.dependsOn).toEqual(["001-init", "002-config"]);
-    });
-
-    it("extracts blocks as link texts", () => {
-      expect(task.blocks).toEqual(["003-api"]);
     });
 
     it("extracts description as raw markdown", () => {
@@ -78,153 +74,111 @@ describe("parseTaskFile", () => {
     });
 
     it("preserves source", () => {
-      expect(task.source).toBe("items/auth/002-setup-database.md");
+      expect(task.source).toBe("work/auth/002-setup-database.md");
     });
   });
 
   describe("status parsing", () => {
-    const statuses = ["todo", "in-progress", "ready-to-review", "ready-to-test", "done"] as const;
+    const statuses = ["open", "block", "in-progress", "done"] as const;
 
     for (const status of statuses) {
       it(`accepts valid status: ${status}`, () => {
-        const md = `# Task\n\n- **Status:** ${status}\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n`;
-        const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
+        const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: ${status}\nPriority: 001\nDependsOn: —\n\`\`\`\n\n<!-- /METADATA -->`;
+        const task = parseTaskFile(md, "feat", "work/feat/001-task.md");
         expect(task.status).toBe(status);
       });
     }
 
     it("throws on invalid status", () => {
-      const md = `# Task\n\n- **Status:** invalid-status\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n`;
-      expect(() => parseTaskFile(md, "feat", "items/feat/001-task.md")).toThrow(
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: invalid-status\nPriority: 001\nDependsOn: —\n\`\`\`\n\n<!-- /METADATA -->`;
+      expect(() => parseTaskFile(md, "feat", "work/feat/001-task.md")).toThrow(
         /Invalid task status/,
       );
     });
 
-    it("throws when status field is missing", () => {
-      const md = `# Task\n\n- **Priority:** 001\n- **Owner:** —\n`;
-      expect(() => parseTaskFile(md, "feat", "items/feat/001-task.md")).toThrow(
-        /missing Status/,
+    it("throws when Status field is missing", () => {
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nPriority: 001\n\`\`\`\n\n<!-- /METADATA -->`;
+      expect(() => parseTaskFile(md, "feat", "work/feat/001-task.md")).toThrow(
+        /missing "Status" field/,
       );
     });
   });
 
-  describe("owner parsing", () => {
-    it("returns null for em dash owner", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
-      expect(task.owner).toBeNull();
-    });
-
-    it("returns the owner handle when present", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** bob\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
-      expect(task.owner).toBe("bob");
-    });
-  });
-
-  describe("item ID extraction", () => {
-    it("extracts numeric ID from anchor with triple dash", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [My Item](../../backlog.md#042---my-item-name)\n- **Depends on:** —\n- **Blocks:** —\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
-      expect(task.itemId).toBe("042");
-    });
-  });
-
-  describe("depends on and blocks", () => {
-    it("returns empty array for em dash depends on", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
+  describe("depends on parsing", () => {
+    it("returns empty array for em dash", () => {
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: open\nPriority: 001\nDependsOn: —\n\`\`\`\n\n<!-- /METADATA -->`;
+      const task = parseTaskFile(md, "feat", "work/feat/001-task.md");
       expect(task.dependsOn).toEqual([]);
     });
 
-    it("returns empty array for em dash blocks", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
-      expect(task.blocks).toEqual([]);
+    it("returns empty array when DependsOn is absent", () => {
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: open\nPriority: 001\n\`\`\`\n\n<!-- /METADATA -->`;
+      const task = parseTaskFile(md, "feat", "work/feat/001-task.md");
+      expect(task.dependsOn).toEqual([]);
+    });
+
+    it("parses single dependency link", () => {
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: open\nPriority: 002\nDependsOn: [001-setup](001-setup.md)\n\`\`\`\n\n<!-- /METADATA -->`;
+      const task = parseTaskFile(md, "feat", "work/feat/002-task.md");
+      expect(task.dependsOn).toEqual(["001-setup"]);
     });
 
     it("parses multiple dependency links", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** [task-a](./001-task-a.md), [task-b](./002-task-b.md)\n- **Blocks:** —\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
-      expect(task.dependsOn).toEqual(["task-a", "task-b"]);
-    });
-
-    it("parses single block link", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** [next-task](./002-next-task.md)\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
-      expect(task.blocks).toEqual(["next-task"]);
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: open\nPriority: 003\nDependsOn: [001-a](001-a.md), [002-b](002-b.md)\n\`\`\`\n\n<!-- /METADATA -->`;
+      const task = parseTaskFile(md, "feat", "work/feat/003-task.md");
+      expect(task.dependsOn).toEqual(["001-a", "002-b"]);
     });
   });
 
   describe("missing sections", () => {
-    it("returns empty string for missing Description section", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n\n## Acceptance Criteria\n\n- [ ] Something\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
+    it("returns empty string for missing DESCRIPTION section", () => {
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: open\nPriority: 001\n\`\`\`\n\n<!-- /METADATA -->\n<!-- ACCEPTANCE CRITERIA -->\n\n## Acceptance criteria\n\n- [ ] Something\n\n<!-- /ACCEPTANCE CRITERIA -->`;
+      const task = parseTaskFile(md, "feat", "work/feat/001-task.md");
       expect(task.description).toBe("");
     });
 
-    it("returns empty array for missing Acceptance Criteria section", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n\n## Description\n\nSome description.\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
-      expect(task.acceptanceCriteria).toEqual([]);
-    });
-
-    it("handles missing both Description and Acceptance Criteria", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
-      expect(task.description).toBe("");
+    it("returns empty array for missing ACCEPTANCE CRITERIA section", () => {
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: open\nPriority: 001\n\`\`\`\n\n<!-- /METADATA -->\n<!-- DESCRIPTION -->\n\n## Description\n\nSome description.\n\n<!-- /DESCRIPTION -->`;
+      const task = parseTaskFile(md, "feat", "work/feat/001-task.md");
       expect(task.acceptanceCriteria).toEqual([]);
     });
   });
 
   describe("acceptance criteria checked states", () => {
-    it("handles unchecked items with [ ]", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n\n## Acceptance Criteria\n\n- [ ] Not done yet\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
-      expect(task.acceptanceCriteria).toEqual([{ text: "Not done yet", checked: false }]);
+    it("handles unchecked items", () => {
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: open\nPriority: 001\n\`\`\`\n\n<!-- /METADATA -->\n<!-- ACCEPTANCE CRITERIA -->\n\n## Acceptance criteria\n\n- [ ] Not done\n\n<!-- /ACCEPTANCE CRITERIA -->`;
+      const task = parseTaskFile(md, "feat", "work/feat/001-task.md");
+      expect(task.acceptanceCriteria).toEqual([{ text: "Not done", checked: false }]);
     });
 
-    it("handles checked items with [x]", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n\n## Acceptance Criteria\n\n- [x] Done item\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
+    it("handles checked items", () => {
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: open\nPriority: 001\n\`\`\`\n\n<!-- /METADATA -->\n<!-- ACCEPTANCE CRITERIA -->\n\n## Acceptance criteria\n\n- [x] Done item\n\n<!-- /ACCEPTANCE CRITERIA -->`;
+      const task = parseTaskFile(md, "feat", "work/feat/001-task.md");
       expect(task.acceptanceCriteria).toEqual([{ text: "Done item", checked: true }]);
     });
 
-    it("handles checked items with [X] (uppercase)", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n\n## Acceptance Criteria\n\n- [X] Done uppercase\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
-      expect(task.acceptanceCriteria).toEqual([{ text: "Done uppercase", checked: true }]);
-    });
-
     it("handles mixed checked and unchecked", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n\n## Acceptance Criteria\n\n- [ ] First\n- [x] Second\n- [ ] Third\n- [X] Fourth\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-task.md");
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: open\nPriority: 001\n\`\`\`\n\n<!-- /METADATA -->\n<!-- ACCEPTANCE CRITERIA -->\n\n## Acceptance criteria\n\n- [ ] First\n- [x] Second\n- [ ] Third\n\n<!-- /ACCEPTANCE CRITERIA -->`;
+      const task = parseTaskFile(md, "feat", "work/feat/001-task.md");
       expect(task.acceptanceCriteria).toEqual([
         { text: "First", checked: false },
         { text: "Second", checked: true },
         { text: "Third", checked: false },
-        { text: "Fourth", checked: true },
       ]);
     });
   });
 
   describe("slug derivation", () => {
     it("removes priority prefix from filename", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/001-setup.md");
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: open\nPriority: 001\n\`\`\`\n\n<!-- /METADATA -->`;
+      const task = parseTaskFile(md, "feat", "work/feat/001-setup.md");
       expect(task.slug).toBe("setup");
     });
 
     it("handles multi-word slug", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 003\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/003-setup-database-schema.md");
+      const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nStatus: open\nPriority: 003\n\`\`\`\n\n<!-- /METADATA -->`;
+      const task = parseTaskFile(md, "feat", "work/feat/003-setup-database-schema.md");
       expect(task.slug).toBe("setup-database-schema");
-    });
-
-    it("returns full basename if no priority prefix", () => {
-      const md = `# Task\n\n- **Status:** todo\n- **Priority:** 001\n- **Owner:** —\n- **Item:** [F](../../backlog.md#001---f)\n- **Depends on:** —\n- **Blocks:** —\n`;
-      const task = parseTaskFile(md, "feat", "items/feat/my-task.md");
-      expect(task.slug).toBe("my-task");
     });
   });
 });

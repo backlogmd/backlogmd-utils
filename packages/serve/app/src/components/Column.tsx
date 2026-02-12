@@ -1,30 +1,18 @@
 import { ItemCard } from "./ItemCard";
-
-interface Item {
-  name: string;
-  description: string;
-  status: string;
-  statusDerived: string | null;
-  itemSlug: string | null;
-}
-
-interface ItemFolder {
-  slug: string;
-  tasks: { status: string }[];
-}
+import type { DisplayItem } from "./Board";
 
 export function Column({
   title,
   icon,
   color,
   items,
-  itemFolders,
+  onAdd,
 }: {
   title: string;
   icon: string;
   color: string;
-  items: Item[];
-  itemFolders: ItemFolder[];
+  items: DisplayItem[];
+  onAdd?: () => void;
 }) {
   return (
     <section className={`${color} rounded-xl p-5 min-h-48`}>
@@ -34,13 +22,22 @@ export function Column({
         <span className="ml-auto text-xs font-medium text-slate-400 bg-white/60 rounded-full px-2 py-0.5">
           {items.length}
         </span>
+        {onAdd && (
+          <button
+            onClick={onAdd}
+            className="ml-1 w-6 h-6 flex items-center justify-center rounded-full text-slate-400 hover:text-blue-600 hover:bg-white/80 transition-colors text-lg leading-none"
+            aria-label="Add work"
+          >
+            +
+          </button>
+        )}
       </div>
       <div className="space-y-3">
         {items.length === 0 ? (
           <p className="text-slate-400 text-sm py-4 text-center">No items</p>
         ) : (
           items.map((item) => (
-            <ItemCard key={item.itemSlug ?? item.name} item={item} itemFolders={itemFolders} />
+            <ItemCard key={item.slug} item={item} />
           ))
         )}
       </div>

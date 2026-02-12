@@ -1,8 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 
+export interface ValidationIssue {
+  code: string;
+  message: string;
+  source: string;
+}
+
 interface BacklogData {
+  entries: unknown[];
   items: unknown[];
-  itemFolders: unknown[];
+  tasks: unknown[];
+  validation?: {
+    errors: ValidationIssue[];
+    warnings: ValidationIssue[];
+  };
   [key: string]: unknown;
 }
 
@@ -38,5 +49,8 @@ export function useBacklog() {
     };
   }, []);
 
-  return { data, connected };
+  const errors = data?.validation?.errors ?? [];
+  const warnings = data?.validation?.warnings ?? [];
+
+  return { data, connected, errors, warnings };
 }

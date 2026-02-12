@@ -4,120 +4,106 @@ import { parseBacklog } from "./parse-backlog.js";
 import { parseItemIndex } from "./parse-item-index.js";
 import { parseTaskFile } from "./parse-task-file.js";
 import { crossLink } from "./cross-link.js";
-import type { BacklogOutput, ItemFolder, RoadmapItem, Task } from "./types.js";
-
-/**
- * Serialize a RoadmapItem to the canonical JSON shape.
- */
-function serializeItem(item: RoadmapItem) {
-  return {
-    id: item.id,
-    name: item.name,
-    type: item.type,
-    statusDeclared: item.status,
-    statusDerived: item.statusDerived,
-    slug: item.itemSlug,
-    description: item.description,
-    tasks: item.taskRefs,
-    source: item.source,
-  };
-}
-
-/**
- * Serialize an ItemFolder to the canonical JSON shape.
- */
-function serializeItemFolder(folder: ItemFolder) {
-  return {
-    slug: folder.slug,
-    name: folder.name,
-    type: folder.type,
-    status: folder.status,
-    goal: folder.goal,
-    tasks: folder.tasks.map((t) => t.priority),
-    source: folder.source,
-  };
-}
-
-/**
- * Serialize a Task to the canonical JSON shape.
- */
-function serializeTask(t: Task) {
-  return {
-    id: t.id,
-    slug: t.slug,
-    name: t.name,
-    status: t.status,
-    priority: t.priority,
-    owner: t.owner,
-    itemId: t.itemId,
-    dependsOn: t.dependsOn,
-    blocks: t.blocks,
-    description: t.description,
-    acceptanceCriteria: t.acceptanceCriteria,
-    source: t.source,
-  };
-}
+import type { BacklogOutput, BacklogEntry, ItemFolder, Task, ValidationIssue } from "./types.js";
 
 /**
  * Run the full pipeline: read files from rootDir, parse, cross-link, and return
  * the canonical BacklogOutput object.
+ *
+ * SPEC v2: reads from work/ directory (not items/).
+ *
+ * Individual parse errors are collected as validation errors rather than
+ * throwing — a malformed task file won't prevent the rest of the backlog
+ * from being parsed.
  */
 export function buildBacklogOutput(rootDir: string): BacklogOutput {
   const absRoot = path.resolve(rootDir);
+  const parseErrors: ValidationIssue[] = [];
 
   // 1. Parse backlog.md
+  let entries: BacklogEntry[] = [];
   const backlogPath = path.join(absRoot, "backlog.md");
-  const backlogContent = fs.readFileSync(backlogPath, "utf-8");
-  const items = parseBacklog(backlogContent, "backlog.md");
 
-  // 2. Discover and parse item folders
-  const itemsDir = path.join(absRoot, "items");
+  try {
+    const backlogContent = fs.readFileSync(backlogPath, "utf-8");
+    entries = parseBacklog(backlogContent, "backlog.md");
+  } catch (err) {
+    parseErrors.push({
+      code: "BACKLOG_PARSE_ERROR",
+      message: `Failed to parse backlog.md: ${(err as Error).message}`,
+      source: "backlog.md",
+    });
+  }
+
+  // 2. Discover and parse item folders from work/
+  const workDir = path.join(absRoot, "work");
   const itemFolders: ItemFolder[] = [];
   const tasks: Task[] = [];
 
-  if (fs.existsSync(itemsDir)) {
-    const slugs = fs.readdirSync(itemsDir).filter((entry) => {
-      const fullPath = path.join(itemsDir, entry);
+  if (fs.existsSync(workDir)) {
+    const slugs = fs.readdirSync(workDir).filter((entry) => {
+      const fullPath = path.join(workDir, entry);
       return fs.statSync(fullPath).isDirectory() && !entry.startsWith(".");
     });
 
     for (const slug of slugs) {
-      const itemDir = path.join(itemsDir, slug);
+      const itemDir = path.join(workDir, slug);
       const indexPath = path.join(itemDir, "index.md");
 
       if (!fs.existsSync(indexPath)) continue;
 
-      const indexContent = fs.readFileSync(indexPath, "utf-8");
-      const indexSource = `items/${slug}/index.md`;
-      const folder = parseItemIndex(indexContent, slug, indexSource);
+      const indexSource = `work/${slug}/index.md`;
+      let folder: ItemFolder;
+
+      try {
+        const indexContent = fs.readFileSync(indexPath, "utf-8");
+        folder = parseItemIndex(indexContent, slug, indexSource);
+      } catch (err) {
+        parseErrors.push({
+          code: "INDEX_PARSE_ERROR",
+          message: `Failed to parse ${indexSource}: ${(err as Error).message}`,
+          source: indexSource,
+        });
+        continue;
+      }
+
       itemFolders.push(folder);
 
       // 3. Parse task files listed in the item index
-      for (const stub of folder.tasks) {
-        const taskPath = path.join(itemDir, stub.fileName);
+      for (const ref of folder.tasks) {
+        const taskPath = path.join(itemDir, ref.fileName);
         if (!fs.existsSync(taskPath)) continue;
 
-        const taskContent = fs.readFileSync(taskPath, "utf-8");
-        const taskSource = `items/${slug}/${stub.fileName}`;
-        const task = parseTaskFile(taskContent, slug, taskSource);
-        tasks.push(task);
+        const taskSource = `work/${slug}/${ref.fileName}`;
+
+        try {
+          const taskContent = fs.readFileSync(taskPath, "utf-8");
+          const task = parseTaskFile(taskContent, slug, taskSource);
+          tasks.push(task);
+        } catch (err) {
+          parseErrors.push({
+            code: "TASK_PARSE_ERROR",
+            message: `Failed to parse ${taskSource}: ${(err as Error).message}`,
+            source: taskSource,
+          });
+        }
       }
     }
   }
 
   // 4. Cross-link
-  const linkResult = crossLink(items, itemFolders, tasks);
+  const linkResult = crossLink(entries, itemFolders, tasks);
 
-  // 5. Build output
+  // 5. Build output — merge parse errors with cross-link errors
   return {
-    protocol: "backlogmd/v1",
+    protocol: "backlogmd/v2",
     generatedAt: new Date().toISOString(),
     rootDir: absRoot,
-    items: linkResult.items,
-    itemFolders,
+    entries: linkResult.entries,
+    items: itemFolders,
     tasks,
     validation: {
-      errors: linkResult.errors,
+      errors: [...parseErrors, ...linkResult.errors],
       warnings: linkResult.warnings,
     },
   };
@@ -127,16 +113,7 @@ export function buildBacklogOutput(rootDir: string): BacklogOutput {
  * Serialize a BacklogOutput to the canonical JSON string.
  */
 export function serializeOutput(output: BacklogOutput): string {
-  const json = {
-    protocol: output.protocol,
-    generatedAt: output.generatedAt,
-    rootDir: output.rootDir,
-    items: output.items.map(serializeItem),
-    itemFolders: output.itemFolders.map(serializeItemFolder),
-    tasks: output.tasks.map(serializeTask),
-    validation: output.validation,
-  };
-  return JSON.stringify(json, null, 2);
+  return JSON.stringify(output, null, 2);
 }
 
 /**

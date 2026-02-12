@@ -19,59 +19,21 @@ vi.mock("node:fs", () => ({
 const { renderHtml } = await import("../src/html.js");
 
 const mockOutput = {
-  protocol: "backlogmd/v1",
+  protocol: "backlogmd/v2",
   generatedAt: "2026-01-01T00:00:00.000Z",
   rootDir: "/test/.backlogmd",
+  entries: [
+    { slug: "001-feat-user-auth", source: "backlog.md" },
+    { slug: "002-feat-dashboard", source: "backlog.md" },
+  ],
   items: [
     {
-      id: "001",
-      name: "User Auth",
-      type: "feature" as const,
-      status: "in-progress" as const,
-      statusDerived: "in-progress" as const,
-      itemSlug: "user-auth",
-      description: "Add user authentication",
-      taskRefs: ["user-auth/001", "user-auth/002"],
-      source: "backlog.md",
-    },
-    {
-      id: "002",
-      name: "Dashboard",
-      type: "feature" as const,
-      status: "todo" as const,
-      statusDerived: "todo" as const,
-      itemSlug: "dashboard",
-      description: "Build dashboard",
-      taskRefs: [],
-      source: "backlog.md",
-    },
-  ],
-  itemFolders: [
-    {
-      slug: "user-auth",
-      name: "User Auth",
-      type: "feature" as const,
-      status: "open" as const,
-      goal: "Add user auth",
+      slug: "001-feat-user-auth",
       tasks: [
-        {
-          priority: "001",
-          name: "Setup",
-          fileName: "001-setup.md",
-          status: "done" as const,
-          owner: "@alice",
-          dependsOn: [],
-        },
-        {
-          priority: "002",
-          name: "Login",
-          fileName: "002-login.md",
-          status: "in-progress" as const,
-          owner: "@bob",
-          dependsOn: ["001"],
-        },
+        { slug: "001-setup", fileName: "001-setup.md" },
+        { slug: "002-login", fileName: "002-login.md" },
       ],
-      source: "items/user-auth/index.md",
+      source: "work/001-feat-user-auth/index.md",
     },
   ],
   tasks: [],
@@ -90,9 +52,9 @@ describe("html", () => {
     const match = html.match(/<script>window\.__BACKLOG__=(.*?)<\/script>/);
     expect(match).not.toBeNull();
     const parsed = JSON.parse(match![1]);
-    expect(parsed.protocol).toBe("backlogmd/v1");
-    expect(parsed.items).toHaveLength(2);
-    expect(parsed.items[0].name).toBe("User Auth");
+    expect(parsed.protocol).toBe("backlogmd/v2");
+    expect(parsed.entries).toHaveLength(2);
+    expect(parsed.entries[0].slug).toBe("001-feat-user-auth");
   });
 
   it("preserves the rest of the HTML template", () => {

@@ -1,8 +1,9 @@
 import { useBacklog } from "./hooks/useBacklog";
 import { Board } from "./components/Board";
+import { NotificationBanner } from "./components/NotificationBanner";
 
 export function App() {
-  const { data, connected } = useBacklog();
+  const { data, connected, errors, warnings } = useBacklog();
 
   return (
     <div className="bg-slate-50 min-h-screen">
@@ -23,6 +24,7 @@ export function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
+        <NotificationBanner errors={errors} warnings={warnings} />
         {data ? (
           <Board data={data as any} />
         ) : (

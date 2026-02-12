@@ -1,311 +1,185 @@
-import { parseMd } from "./md.js";
 import type { Task, TaskStatus, AcceptanceCriterion } from "./types.js";
-import type {
-  Root,
-  Heading,
-  List,
-  ListItem,
-  Paragraph,
-  Strong,
-  Text,
-  Link,
-  PhrasingContent,
-} from "mdast";
+import { parseMd } from "./md.js";
+import type { Root, Heading, List, ListItem, Paragraph, PhrasingContent } from "mdast";
 import path from "node:path";
 
-const VALID_STATUSES: TaskStatus[] = [
-  "todo",
-  "in-progress",
-  "ready-to-review",
-  "ready-to-test",
-  "done",
-];
+const VALID_STATUSES: TaskStatus[] = ["open", "block", "in-progress", "done"];
 
+/**
+ * Parse a SPEC v2 task file.
+ *
+ * SPEC v2 format uses HTML comment sections with a fenced code block for metadata:
+ *
+ * ```
+ * <!-- METADATA -->
+ * \`\`\`
+ * Task: <Task Name>
+ * Status: <status>
+ * Priority: <NNN>
+ * DependsOn: [<task-slug>](relative-path-to-task.md)
+ * \`\`\`
+ * <!-- /METADATA -->
+ * <!-- DESCRIPTION -->
+ * ## Description
+ * <text>
+ * <!-- /DESCRIPTION -->
+ * <!-- ACCEPTANCE CRITERIA -->
+ * ## Acceptance criteria
+ * - [ ] <criterion>
+ * <!-- /ACCEPTANCE CRITERIA -->
+ * ```
+ */
 export function parseTaskFile(
   content: string,
   itemSlug: string,
   source: string,
 ): Task {
-  const tree: Root = parseMd(content);
+  // Extract sections using HTML comment boundaries
+  const metadataRaw = extractSection(content, "METADATA");
+  const descriptionRaw = extractSection(content, "DESCRIPTION");
+  const acRaw = extractSection(content, "ACCEPTANCE CRITERIA");
 
-  const name = extractTaskName(tree);
-  const metadata = extractMetadata(tree);
+  // Parse metadata from the fenced code block
+  const metadata = parseMetadataBlock(metadataRaw, source);
 
-  const status = parseStatus(metadata.get("Status"));
-  const priority = metadata.get("Priority") ?? "";
-  const owner = parseOwner(metadata.get("Owner"));
-  const itemId = parseItemId(metadata.get("Item"), tree);
-  const dependsOn = parseLinkList(metadata.get("Depends on"), tree);
-  const blocks = parseLinkList(metadata.get("Blocks"), tree);
+  // Parse description: strip the ## Description heading
+  const description = cleanDescription(descriptionRaw);
 
-  const description = extractSectionContent(tree, content, "Description");
-  const acceptanceCriteria = extractAcceptanceCriteria(tree);
+  // Parse acceptance criteria from markdown checkboxes
+  const acceptanceCriteria = parseAcceptanceCriteria(acRaw);
 
   const slug = deriveSlug(source);
-  const id = `${itemSlug}/${priority}`;
 
   return {
-    id,
+    name: metadata.task,
+    status: metadata.status,
+    priority: metadata.priority,
     slug,
-    name,
-    status,
-    priority,
-    owner,
-    itemId,
-    dependsOn,
-    blocks,
+    itemSlug,
+    dependsOn: metadata.dependsOn,
     description,
     acceptanceCriteria,
     source,
   };
 }
 
-function extractTaskName(tree: Root): string {
-  const h1 = tree.children.find(
-    (node): node is Heading => node.type === "heading" && node.depth === 1,
-  );
-  if (!h1) {
-    throw new Error("Task file missing h1 heading");
-  }
-  return collectText(h1.children);
-}
-
-function collectText(nodes: PhrasingContent[]): string {
-  return nodes
-    .map((n) => {
-      if (n.type === "text") return (n as Text).value;
-      if ("children" in n) return collectText(n.children as PhrasingContent[]);
-      return "";
-    })
-    .join("");
+/**
+ * Extract the content between `<!-- SECTION -->` and `<!-- /SECTION -->` markers.
+ */
+function extractSection(content: string, sectionName: string): string {
+  const startTag = `<!-- ${sectionName} -->`;
+  const endTag = `<!-- /${sectionName} -->`;
+  const startIndex = content.indexOf(startTag);
+  const endIndex = content.indexOf(endTag);
+  if (startIndex === -1 || endIndex === -1) return "";
+  return content.slice(startIndex + startTag.length, endIndex).trim();
 }
 
 /**
- * Extracts the metadata bullet list that follows the h1 heading.
- * Returns a map of label -> raw text value (the part after "Label: ").
- * For link-bearing fields, returns the raw text but we also parse links separately from the AST.
+ * Parse key-value pairs from a fenced code block inside the METADATA section.
  */
-function extractMetadata(tree: Root): Map<string, string> {
-  const result = new Map<string, string>();
-
-  // Find the first list after h1
-  const h1Index = tree.children.findIndex(
-    (node) => node.type === "heading" && (node as Heading).depth === 1,
-  );
-  if (h1Index === -1) return result;
-
-  const list = tree.children
-    .slice(h1Index + 1)
-    .find((node): node is List => node.type === "list");
-  if (!list) return result;
-
-  for (const item of list.children) {
-    const li = item as ListItem;
-    if (!li.children.length) continue;
-    const para = li.children[0];
-    if (para.type !== "paragraph") continue;
-
-    const p = para as Paragraph;
-    // Look for pattern: Strong("Label:") followed by text/links
-    const strongNode = p.children.find(
-      (c): c is Strong => c.type === "strong",
-    );
-    if (!strongNode) continue;
-
-    const labelText = collectText(strongNode.children).replace(/:$/, "");
-
-    // Collect the text content after the strong node
-    const strongIndex = p.children.indexOf(strongNode);
-    const afterStrong = p.children.slice(strongIndex + 1);
-    const value = collectText(afterStrong).trim();
-
-    result.set(labelText, value);
+function parseMetadataBlock(
+  raw: string,
+  source: string,
+): {
+  task: string;
+  status: TaskStatus;
+  priority: string;
+  dependsOn: string[];
+} {
+  // Extract content from the fenced code block (``` ... ```)
+  const codeMatch = raw.match(/```[\s\S]*?\n([\s\S]*?)```/);
+  if (!codeMatch) {
+    throw new Error(`Metadata code block not found in ${source}`);
   }
 
-  return result;
+  const lines = codeMatch[1].split("\n");
+  const metadata: Record<string, string> = {};
+
+  for (const line of lines) {
+    const colonIndex = line.indexOf(":");
+    if (colonIndex === -1) continue;
+    const key = line.slice(0, colonIndex).trim();
+    const value = line.slice(colonIndex + 1).trim();
+    if (key) metadata[key] = value;
+  }
+
+  // Validate required fields
+  const taskName = metadata["Task"];
+  if (!taskName) {
+    throw new Error(`Task file missing "Task" field in metadata (${source})`);
+  }
+
+  const statusRaw = metadata["Status"];
+  if (!statusRaw) {
+    throw new Error(`Task file missing "Status" field in metadata (${source})`);
+  }
+
+  const status = parseStatus(statusRaw, source);
+  const priority = metadata["Priority"] ?? "";
+
+  // Parse DependsOn — may contain markdown links or be "—" / empty
+  const dependsOnRaw = metadata["DependsOn"] ?? "";
+  const dependsOn = parseDependsOn(dependsOnRaw);
+
+  return { task: taskName, status, priority, dependsOn };
 }
 
-function parseStatus(raw: string | undefined): TaskStatus {
-  if (!raw) {
-    throw new Error("Task file missing Status field");
-  }
-  const trimmed = raw.trim();
+/**
+ * Validate and return a TaskStatus.
+ */
+function parseStatus(raw: string, source: string): TaskStatus {
+  const trimmed = raw.trim().toLowerCase();
   if (!VALID_STATUSES.includes(trimmed as TaskStatus)) {
     throw new Error(
-      `Invalid task status: "${trimmed}". Must be one of: ${VALID_STATUSES.join(", ")}`,
+      `Invalid task status: "${raw}" in ${source}. Must be one of: ${VALID_STATUSES.join(", ")}`,
     );
   }
   return trimmed as TaskStatus;
 }
 
-function parseOwner(raw: string | undefined): string | null {
-  if (!raw || raw.trim() === "—" || raw.trim() === "-") return null;
-  return raw.trim();
-}
-
 /**
- * Parse the Item field to extract the item id from the anchor link.
- * E.g., the link href "../../backlog.md#001---item-name" -> "001"
+ * Parse the DependsOn field value.
+ *
+ * Can be:
+ * - Empty or "—" → no dependencies
+ * - A markdown link: [slug](path.md) → extract the link text
+ * - Multiple comma-separated links
  */
-function parseItemId(raw: string | undefined, tree: Root): string {
-  // Walk the metadata list to find the Item field's link
-  const h1Index = tree.children.findIndex(
-    (node) => node.type === "heading" && (node as Heading).depth === 1,
-  );
-  if (h1Index === -1) return raw ?? "";
-
-  const list = tree.children
-    .slice(h1Index + 1)
-    .find((node): node is List => node.type === "list");
-  if (!list) return raw ?? "";
-
-  for (const item of list.children) {
-    const li = item as ListItem;
-    if (!li.children.length) continue;
-    const para = li.children[0];
-    if (para.type !== "paragraph") continue;
-    const p = para as Paragraph;
-
-    const strongNode = p.children.find(
-      (c): c is Strong => c.type === "strong",
-    );
-    if (!strongNode) continue;
-    const label = collectText(strongNode.children).replace(/:$/, "");
-    if (label !== "Item") continue;
-
-    // Find a link node in this paragraph
-    const linkNode = p.children.find((c): c is Link => c.type === "link");
-    if (!linkNode) break;
-
-    const url = linkNode.url;
-    const hashIndex = url.indexOf("#");
-    if (hashIndex === -1) break;
-
-    const anchor = url.slice(hashIndex + 1);
-    // Extract the numeric prefix before the first "---"
-    const match = anchor.match(/^(\d+)---/);
-    if (match) return match[1];
-    // Fallback: return the whole anchor
-    return anchor;
+function parseDependsOn(raw: string): string[] {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === "—" || trimmed === "-" || trimmed === "–") {
+    return [];
   }
 
-  return raw ?? "";
-}
-
-/**
- * Parse a link list field (Depends on / Blocks).
- * Returns link texts for link nodes, or an empty array for em dash.
- */
-function parseLinkList(raw: string | undefined, tree: Root): string[] {
-  if (!raw || raw.trim() === "—" || raw.trim() === "-") return [];
-
-  // Walk the AST to find the actual link nodes for this field
-  // We need to find the right metadata list item
-  const h1Index = tree.children.findIndex(
-    (node) => node.type === "heading" && (node as Heading).depth === 1,
-  );
-  if (h1Index === -1) return raw ? [raw.trim()] : [];
-
-  const list = tree.children
-    .slice(h1Index + 1)
-    .find((node): node is List => node.type === "list");
-  if (!list) return raw ? [raw.trim()] : [];
-
-  // Determine which label we're looking for based on the raw value
-  // We need to check both "Depends on" and "Blocks" items
-  for (const item of list.children) {
-    const li = item as ListItem;
-    if (!li.children.length) continue;
-    const para = li.children[0];
-    if (para.type !== "paragraph") continue;
-    const p = para as Paragraph;
-
-    const strongNode = p.children.find(
-      (c): c is Strong => c.type === "strong",
-    );
-    if (!strongNode) continue;
-    const label = collectText(strongNode.children).replace(/:$/, "");
-
-    // Check if this item's text matches our raw value
-    const strongIndex = p.children.indexOf(strongNode);
-    const afterStrong = p.children.slice(strongIndex + 1);
-    const itemText = collectText(afterStrong).trim();
-    if (itemText !== raw) continue;
-
-    // Collect link texts from this paragraph
-    const links: string[] = [];
-    for (const child of afterStrong) {
-      if (child.type === "link") {
-        links.push(collectText((child as Link).children));
-      }
-    }
-    if (links.length > 0) return links;
-
-    // No links found, but we have text - split by comma
-    if (label === "Depends on" || label === "Blocks") {
-      return itemText
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-    }
+  // Extract link texts from markdown link syntax: [text](url)
+  const linkPattern = /\[([^\]]+)\]\([^)]+\)/g;
+  const links: string[] = [];
+  let match;
+  while ((match = linkPattern.exec(trimmed)) !== null) {
+    links.push(match[1].trim());
   }
 
-  return raw
+  if (links.length > 0) return links;
+
+  // Fallback: split by comma
+  return trimmed
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 }
 
 /**
- * Extract the content of a ## section as raw markdown.
- * Returns the raw markdown text between the section heading and the next heading or EOF.
+ * Clean the description section: remove the ## Description heading line.
  */
-function extractSectionContent(
-  tree: Root,
-  rawContent: string,
-  sectionName: string,
-): string {
-  const lines = rawContent.split("\n");
-
-  // Find the h2 heading for this section
-  let sectionHeadingIndex = -1;
-  let nextHeadingIndex = -1;
-
-  for (let i = 0; i < tree.children.length; i++) {
-    const node = tree.children[i];
-    if (node.type === "heading") {
-      const h = node as Heading;
-      if (h.depth === 2 && collectText(h.children) === sectionName) {
-        sectionHeadingIndex = i;
-        // Find next heading
-        for (let j = i + 1; j < tree.children.length; j++) {
-          if (tree.children[j].type === "heading") {
-            nextHeadingIndex = j;
-            break;
-          }
-        }
-        break;
-      }
-    }
-  }
-
-  if (sectionHeadingIndex === -1) return "";
-
-  const sectionNode = tree.children[sectionHeadingIndex];
-  const startLine = sectionNode.position!.end.line;
-
-  let endLine: number;
-  if (nextHeadingIndex !== -1) {
-    endLine = tree.children[nextHeadingIndex].position!.start.line - 1;
-  } else {
-    endLine = lines.length;
-  }
-
-  // Extract lines between section heading and next heading
-  const sectionLines = lines.slice(startLine, endLine);
-
-  // Trim leading/trailing blank lines
-  return trimBlankLines(sectionLines.join("\n"));
+function cleanDescription(raw: string): string {
+  if (!raw) return "";
+  // Remove the heading line
+  const lines = raw.split("\n");
+  const filtered = lines.filter(
+    (line) => !line.match(/^##\s+[Dd]escription\s*$/),
+  );
+  return trimBlankLines(filtered.join("\n"));
 }
 
 function trimBlankLines(s: string): string {
@@ -313,38 +187,22 @@ function trimBlankLines(s: string): string {
 }
 
 /**
- * Extract acceptance criteria from the ## Acceptance Criteria section.
- * Looks for GFM task list items: - [ ] text or - [x] text
+ * Extract acceptance criteria from the ACCEPTANCE CRITERIA section.
+ * Parses GFM task list items: - [ ] text or - [x] text
  */
-function extractAcceptanceCriteria(tree: Root): AcceptanceCriterion[] {
-  // Find the h2 "Acceptance Criteria" heading
-  let sectionIndex = -1;
-  for (let i = 0; i < tree.children.length; i++) {
-    const node = tree.children[i];
-    if (
-      node.type === "heading" &&
-      (node as Heading).depth === 2 &&
-      collectText((node as Heading).children) === "Acceptance Criteria"
-    ) {
-      sectionIndex = i;
-      break;
-    }
-  }
+function parseAcceptanceCriteria(raw: string): AcceptanceCriterion[] {
+  if (!raw) return [];
 
-  if (sectionIndex === -1) return [];
-
-  // Find the next list after this heading
+  // Parse with remark to get proper checkbox handling
+  const tree = parseMd(raw);
   const criteria: AcceptanceCriterion[] = [];
-  for (let i = sectionIndex + 1; i < tree.children.length; i++) {
-    const node = tree.children[i];
-    if (node.type === "heading") break; // Stop at next heading
 
+  for (const node of tree.children) {
     if (node.type === "list") {
       const list = node as List;
       for (const item of list.children) {
         const li = item as ListItem;
         const checked = li.checked === true;
-        // Collect text from the list item
         const text = li.children
           .map((child) => {
             if (child.type === "paragraph") {
@@ -363,6 +221,16 @@ function extractAcceptanceCriteria(tree: Root): AcceptanceCriterion[] {
   }
 
   return criteria;
+}
+
+function collectText(nodes: PhrasingContent[]): string {
+  return nodes
+    .map((n) => {
+      if (n.type === "text") return n.value;
+      if ("children" in n) return collectText(n.children as PhrasingContent[]);
+      return "";
+    })
+    .join("");
 }
 
 function deriveSlug(source: string): string {

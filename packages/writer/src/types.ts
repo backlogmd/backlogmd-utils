@@ -5,13 +5,13 @@ import type { BacklogOutput } from "@backlogmd/types";
  * Replaces `original` text with `replacement` text.
  */
 export interface FilePatch {
-  /** File path relative to the .backlogmd/ root, e.g. "items/my-feature/003-task.md" */
+  /** File path relative to the .backlogmd/ root, e.g. "work/my-feature/003-task.md" */
   filePath: string;
   /** The exact text being replaced */
   original: string;
   /** The new text to insert */
   replacement: string;
-  /** Human-readable description, e.g. "task status: todo → in-progress" */
+  /** Human-readable description, e.g. "task status: open → in-progress" */
   description: string;
 }
 
