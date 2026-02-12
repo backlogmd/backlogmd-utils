@@ -15,14 +15,14 @@ const USAGE = `Usage: backlogmd-serve [options]
 
 Options:
   --dir <path>    Path to .backlogmd/ directory (default: .backlogmd/)
-  --port <port>   Port to listen on (default: 3000)
+  --port <port>   Port to listen on (default: 3030)
   --host <host>   Host to bind to (default: localhost)
   --help          Show this help message`;
 
 export function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = {
     dir: path.join(process.cwd(), ".backlogmd"),
-    port: 3000,
+    port: 3030,
     host: "localhost",
     help: false,
   };
@@ -105,10 +105,13 @@ export function run(argv: string[]): number {
   return 0;
 }
 
-const isDirectRun =
-  process.argv[1] && (process.argv[1].endsWith("/cli.js") || process.argv[1].endsWith("/cli.ts"));
+// Run when executed directly (node cli.js, npx, bin symlink, etc.)
+// Skip when imported as a module (e.g. in tests)
+const isMainModule =
+  process.argv[1] &&
+  fs.realpathSync(process.argv[1]) === fs.realpathSync(new URL(import.meta.url).pathname);
 
-if (isDirectRun) {
+if (isMainModule) {
   const exitCode = run(process.argv.slice(2));
   if (exitCode !== 0) {
     process.exit(exitCode);
