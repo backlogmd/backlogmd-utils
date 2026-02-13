@@ -105,16 +105,7 @@ export function run(argv: string[]): number {
   return 0;
 }
 
-// Run when executed directly (node cli.js, npx, bin symlink, etc.)
-// Skip when imported as a module (e.g. in tests)
-const isMainModule =
-  process.argv[1] &&
-  fs.realpathSync(process.argv[1]) === fs.realpathSync(new URL(import.meta.url).pathname);
-
-if (isMainModule) {
-  const exitCode = run(process.argv.slice(2));
-  if (exitCode !== 0) {
-    process.exit(exitCode);
-  }
-  // exitCode 0 means the server started — keep the process alive
+const exitCode = run(process.argv.slice(2));
+if (exitCode !== 0) {
+  process.exit(exitCode);
 }
