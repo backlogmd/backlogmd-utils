@@ -1,0 +1,2 @@
+- [001-implement-chat-command-parsing](001-implement-chat-command-parsing.md)
+- [002-test-chat-commands](002-test-chat-commands.md)

@@ -1,3 +1,4 @@
 - [003-feat-execute-task](work/003-feat-execute-task/index.md)
 - [004-fix-delete-buttons](work/004-fix-delete-buttons/index.md)
 - [005-feat-vcs-abstraction](work/005-feat-vcs-abstraction/index.md)
+- [006-feat-chat-commands](work/006-feat-chat-commands/index.md)

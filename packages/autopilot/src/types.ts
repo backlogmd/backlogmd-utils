@@ -4,6 +4,7 @@ export interface AgentTask {
   description: string;
   acceptanceCriteria: { text: string; checked: boolean }[];
   source: string;
+  executeOnly?: boolean;
 }
 
 export interface AgentResult {

@@ -458,11 +458,24 @@ export function createServer(port: number, backlogDir: string): ServerResult {
       return reply.status(400).send({ error: "Missing or invalid 'message' field" });
     }
 
+    let command: "work" | "task" | "plan" | "prompt" = "prompt";
+    let taskId = "";
+
+    if (message.startsWith("/work ")) {
+      command = "work";
+      taskId = message.slice(6).trim();
+    } else if (message.startsWith("/task ")) {
+      command = "task";
+      taskId = message.slice(6).trim();
+    } else if (message.startsWith("/plan ")) {
+      command = "plan";
+      taskId = message.slice(6).trim();
+    }
+
     setTimeout(async () => {
       try {
         const { BacklogCore } = await import("@backlogmd/core");
         const { Autopilot, OpenCodeAgent } = await import("@backlogmd/autopilot");
-        fastify.log.info("Direct autopilot execution");
         const autopilotCore = await BacklogCore.load({
           rootDir: backlogDir,
           autoReconcile: false,
@@ -471,11 +484,25 @@ export function createServer(port: number, backlogDir: string): ServerResult {
         const cwd = path.dirname(backlogDir);
         const agent = new OpenCodeAgent(webhookUrl, cwd);
         const autopilot = new Autopilot(autopilotCore, agent);
-        await autopilot.executePrompt(message);
+
+        if (command === "work") {
+          fastify.log.info({ taskId }, "Executing /work command");
+          await autopilot.runWorkById(taskId);
+        } else if (command === "task") {
+          fastify.log.info({ taskId }, "Executing /task command");
+          await autopilot.runTaskById(taskId);
+        } else if (command === "plan") {
+          fastify.log.info({ taskId }, "Executing /plan command");
+          await autopilot.runPlanTask(taskId);
+        } else {
+          fastify.log.info("Executing direct prompt");
+          await autopilot.executePrompt(message);
+        }
+
         notifyClients();
-        fastify.log.info("Direct autopilot execution completed");
+        fastify.log.info("Autopilot execution completed");
       } catch (err) {
-        fastify.log.error({ err }, "Direct autopilot execution failed");
+        fastify.log.error({ err }, "Autopilot execution failed");
       }
     }, 100);
 

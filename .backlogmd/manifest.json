@@ -1,7 +1,7 @@
 {
   "specVersion": "3.0.0",
-  "updatedAt": "2026-02-14T14:30:00.000Z",
-  "openItemCount": 3,
+  "updatedAt": "2026-02-14T14:50:00.000Z",
+  "openItemCount": 4,
   "items": [
     {
       "id": "003",
@@ -156,6 +156,39 @@
           "s": "done",
           "p": 30,
           "dep": ["002"],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        }
+      ]
+    },
+    {
+      "id": "006",
+      "slug": "feat-chat-commands",
+      "path": "work/006-feat-chat-commands",
+      "status": "open",
+      "updated": "2026-02-14T14:45:00.000Z",
+      "tasks": [
+        {
+          "tid": "001",
+          "slug": "implement-chat-command-parsing",
+          "file": "001-implement-chat-command-parsing.md",
+          "t": "Implement chat command parsing in /api/chat",
+          "s": "done",
+          "p": 10,
+          "dep": [],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        },
+        {
+          "tid": "002",
+          "slug": "test-chat-commands",
+          "file": "002-test-chat-commands.md",
+          "t": "Test /work, /task and /plan commands",
+          "s": "done",
+          "p": 20,
+          "dep": ["001"],
           "a": "",
           "h": false,
           "expiresAt": null

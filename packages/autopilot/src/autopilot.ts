@@ -41,8 +41,10 @@ export class Autopilot {
     const manifest = this.core.getManifest();
 
     for (const item of manifest.items) {
-      const task = item.tasks.find((t) => t.tid === taskId);
-      if (task && task.s === "plan") {
+      const task = item.tasks.find(
+        (t) => (t.tid === taskId || t.t.toLowerCase() === taskId.toLowerCase()) && t.s === "plan",
+      );
+      if (task) {
         const source = `${item.path}/${task.file}`;
         const content = await this.core.getTaskContent(source);
         const agentTask: AgentTask = {
@@ -61,12 +63,49 @@ export class Autopilot {
     console.log(`[autopilot] Task ${taskId} not found or not in plan status`);
   }
 
+  async runWorkById(taskId: string): Promise<void> {
+    const manifest = this.core.getManifest();
+
+    for (const item of manifest.items) {
+      const task = item.tasks.find(
+        (t) =>
+          t.tid === taskId ||
+          t.slug === taskId ||
+          t.file === taskId ||
+          t.t.toLowerCase() === taskId.toLowerCase(),
+      );
+      if (task) {
+        const source = `${item.path}/${task.file}`;
+        const content = await this.core.getTaskContent(source);
+
+        const agentTask: AgentTask = {
+          id: task.tid,
+          title: content.title,
+          description: content.description,
+          acceptanceCriteria: content.acceptanceCriteria,
+          source,
+          executeOnly: true,
+        };
+
+        await this.executeTask(agentTask);
+        return;
+      }
+    }
+
+    console.error(`[autopilot] Task "${taskId}" not found`);
+    process.exit(1);
+  }
+
   async runTaskById(taskId: string): Promise<void> {
     const manifest = this.core.getManifest();
 
     for (const item of manifest.items) {
       const task = item.tasks.find(
-        (t) => t.tid === taskId || t.slug === taskId || t.file === taskId,
+        (t) =>
+          t.tid === taskId ||
+          t.slug === taskId ||
+          t.file === taskId ||
+          t.t.toLowerCase() === taskId.toLowerCase(),
       );
       if (task) {
         const source = `${item.path}/${task.file}`;
@@ -116,19 +155,23 @@ export class Autopilot {
   }
 
   private async executeTask(task: AgentTask): Promise<void> {
-    if (task.id === "direct") {
+    const isDirect = task.id === "direct";
+    const isExecuteOnly = task.executeOnly === true;
+
+    if (!isDirect && !isExecuteOnly) {
+      console.log(`[autopilot] Executing task: ${task.title}`);
+      await this.core.updateTaskStatus(task.source, "ip");
+    } else if (isDirect) {
       console.log(`[autopilot] Executing prompt: ${task.title}`);
     } else {
-      console.log(`[autopilot] Executing task: ${task.title}`);
-
-      await this.core.updateTaskStatus(task.source, "ip");
+      console.log(`[autopilot] Executing work on task: ${task.title} (status unchanged)`);
     }
 
     try {
       const result = await this.agent.execute(task);
       if (result.success) {
         console.log(`[autopilot] Task completed successfully`);
-        if (task.id !== "direct") {
+        if (!isDirect && !isExecuteOnly) {
           await this.core.updateTaskStatus(task.source, "done");
 
           if (task.acceptanceCriteria.length > 0) {
@@ -146,13 +189,13 @@ export class Autopilot {
         }
       } else {
         console.error(`[autopilot] Task failed:`, result.error);
-        if (task.id !== "direct") {
+        if (!isDirect && !isExecuteOnly) {
           await this.core.updateTaskStatus(task.source, "open");
         }
       }
     } catch (error) {
       console.error(`[autopilot] Task failed:`, error);
-      if (task.id !== "direct") {
+      if (!isDirect && !isExecuteOnly) {
         await this.core.updateTaskStatus(task.source, "open");
       }
     }
