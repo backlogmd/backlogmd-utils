@@ -6,7 +6,7 @@ function makeTask(overrides: Record<string, unknown> = {}) {
   return {
     name: "Setup project",
     status: "open",
-    priority: "001",
+    priority: 1,
     slug: "001-setup-project",
     itemSlug: "001-feat-my-feature",
     source: "work/001-feat-my-feature/001-setup-project.md",
@@ -34,11 +34,7 @@ describe("TaskRow", () => {
 
   it('shows "Mark done" button when status is not "done"', () => {
     const { container } = render(
-      <TaskRow
-        task={makeTask({ status: "open" })}
-        onStatusChange={() => {}}
-        isPending={false}
-      />,
+      <TaskRow task={makeTask({ status: "open" })} onStatusChange={() => {}} isPending={false} />,
     );
 
     const btn = container.querySelector("button");
@@ -46,13 +42,9 @@ describe("TaskRow", () => {
     expect(btn!.textContent).toBe("Mark done");
   });
 
-  it('shows "Mark done" for in-progress tasks', () => {
+  it('shows "Mark done" for ip tasks', () => {
     const { container } = render(
-      <TaskRow
-        task={makeTask({ status: "in-progress" })}
-        onStatusChange={() => {}}
-        isPending={false}
-      />,
+      <TaskRow task={makeTask({ status: "ip" })} onStatusChange={() => {}} isPending={false} />,
     );
 
     const btn = container.querySelector("button");
@@ -62,11 +54,7 @@ describe("TaskRow", () => {
 
   it('does not show action button when status is "done"', () => {
     const { container } = render(
-      <TaskRow
-        task={makeTask({ status: "done" })}
-        onStatusChange={() => {}}
-        isPending={false}
-      />,
+      <TaskRow task={makeTask({ status: "done" })} onStatusChange={() => {}} isPending={false} />,
     );
 
     const btn = container.querySelector("button");
@@ -94,11 +82,7 @@ describe("TaskRow", () => {
 
   it('shows "Saving..." and disables button when isPending is true', () => {
     const { container } = render(
-      <TaskRow
-        task={makeTask()}
-        onStatusChange={() => {}}
-        isPending={true}
-      />,
+      <TaskRow task={makeTask()} onStatusChange={() => {}} isPending={true} />,
     );
 
     const btn = container.querySelector("button")!;

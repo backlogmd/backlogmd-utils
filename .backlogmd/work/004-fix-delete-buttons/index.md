@@ -1,0 +1,3 @@
+- [investigate-delete-button-issue](001-investigate-delete-button-issue.md)
+- [fix-delete-task-button](002-fix-delete-task-button.md)
+- [fix-delete-work-button](003-fix-delete-work-button.md)

@@ -1,4 +1,0 @@
-- [001-add-itemtype-to-types](001-add-itemtype-to-types.md)
-- [002-create-parse-slug-util](002-create-parse-slug-util.md)
-- [003-wire-into-parser-pipeline](003-wire-into-parser-pipeline.md)
-- [004-update-tests](004-update-tests.md)

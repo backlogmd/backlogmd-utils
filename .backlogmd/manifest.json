@@ -1,0 +1,166 @@
+{
+  "specVersion": "3.0.0",
+  "updatedAt": "2026-02-14T14:30:00.000Z",
+  "openItemCount": 3,
+  "items": [
+    {
+      "id": "003",
+      "slug": "feat-execute-task",
+      "path": "work/003-feat-execute-task",
+      "status": "open",
+      "updated": "2026-02-14T09:00:00.000Z",
+      "tasks": [
+        {
+          "tid": "001",
+          "slug": "add-cli-argument-task-id",
+          "file": "001-add-cli-argument-task-id.md",
+          "t": "Add CLI argument for task ID",
+          "s": "done",
+          "p": 10,
+          "dep": [],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        },
+        {
+          "tid": "002",
+          "slug": "read-full-task-content",
+          "file": "002-read-full-task-content.md",
+          "t": "Read full task content",
+          "s": "done",
+          "p": 20,
+          "dep": [],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        },
+        {
+          "tid": "003",
+          "slug": "pass-task-context-to-agent",
+          "file": "003-pass-task-context-to-agent.md",
+          "t": "Pass task context to agent",
+          "s": "done",
+          "p": 30,
+          "dep": [],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        },
+        {
+          "tid": "004",
+          "slug": "update-task-status-workflow",
+          "file": "004-update-task-status-workflow.md",
+          "t": "Update task status workflow",
+          "s": "done",
+          "p": 40,
+          "dep": [],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        },
+        {
+          "tid": "005",
+          "slug": "add-integration-tests",
+          "file": "005-add-integration-tests.md",
+          "t": "Add integration tests",
+          "s": "done",
+          "p": 50,
+          "dep": [],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        }
+      ]
+    },
+    {
+      "id": "004",
+      "slug": "fix-delete-buttons",
+      "path": "work/004-fix-delete-buttons",
+      "status": "open",
+      "updated": "2026-02-14T09:30:00.000Z",
+      "tasks": [
+        {
+          "tid": "001",
+          "slug": "investigate-delete-button-issue",
+          "file": "001-investigate-delete-button-issue.md",
+          "t": "Investigate delete button click handler issue",
+          "s": "done",
+          "p": 10,
+          "dep": [],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        },
+        {
+          "tid": "002",
+          "slug": "fix-delete-task-button",
+          "file": "002-fix-delete-task-button.md",
+          "t": "Fix delete task button in task list",
+          "s": "done",
+          "p": 20,
+          "dep": ["001"],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        },
+        {
+          "tid": "003",
+          "slug": "fix-delete-work-button",
+          "file": "003-fix-delete-work-button.md",
+          "t": "Fix delete work/item button in item detail modal",
+          "s": "done",
+          "p": 30,
+          "dep": ["001"],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        }
+      ]
+    },
+    {
+      "id": "005",
+      "slug": "feat-vcs-abstraction",
+      "path": "work/005-feat-vcs-abstraction",
+      "status": "open",
+      "updated": "2026-02-14T11:13:28.460Z",
+      "tasks": [
+        {
+          "tid": "001",
+          "slug": "create-vcs-interface",
+          "file": "001-create-vcs-interface.md",
+          "t": "Create VCS abstraction interface",
+          "s": "done",
+          "p": 10,
+          "dep": [],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        },
+        {
+          "tid": "002",
+          "slug": "implement-git-vcs-provider",
+          "file": "002-implement-git-vcs-provider.md",
+          "t": "Implement Git VCS provider",
+          "s": "done",
+          "p": 20,
+          "dep": ["001"],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        },
+        {
+          "tid": "003",
+          "slug": "integrate-vcs-with-autopilot",
+          "file": "003-integrate-vcs-with-autopilot.md",
+          "t": "Integrate VCS with autopilot",
+          "s": "done",
+          "p": 30,
+          "dep": ["002"],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        }
+      ]
+    }
+  ]
+}

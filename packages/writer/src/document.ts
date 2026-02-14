@@ -1,9 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import {
-  type BacklogOutput,
-  type TaskStatus,
-} from "@backlogmd/types";
+import { type BacklogOutput, type TaskStatus } from "@backlogmd/types";
 import { buildBacklogOutput } from "@backlogmd/parser";
 import type { Changeset, FileCache, FilePatch } from "./types.js";
 import { patchMetadataField } from "./patch.js";
@@ -16,20 +13,16 @@ import { applyChangeset } from "./apply.js";
  * related files, inspect the resulting patches, and commit them
  * back to disk as surgical edits.
  *
- * SPEC v2: Task metadata lives in fenced code blocks inside HTML
- * comment sections. Item index and backlog files are simple bullet
- * lists with no metadata to patch.
+ * SPEC v3: Task metadata lives in fenced YAML code blocks inside HTML
+ * comment sections (no closing tags). Item index and backlog files are
+ * simple bullet lists with no metadata to patch.
  */
 export class BacklogDocument {
   private _model: BacklogOutput;
   private _rootDir: string;
   private _cache: FileCache;
 
-  private constructor(
-    model: BacklogOutput,
-    rootDir: string,
-    cache: FileCache,
-  ) {
+  private constructor(model: BacklogOutput, rootDir: string, cache: FileCache) {
     this._model = model;
     this._rootDir = rootDir;
     this._cache = cache;
@@ -87,13 +80,13 @@ export class BacklogDocument {
    *
    * Returns a Changeset that can be inspected (dry-run) or committed.
    *
-   * SPEC v2 cascade:
-   * 1. Patch the task file's metadata code block Status field
+   * SPEC v3 cascade:
+   * 1. Patch the task file's metadata YAML code block s (status) field
    *
-   * In SPEC v2, item index (index.md) is a simple bullet list with no
+   * In SPEC v3, item index (index.md) is a simple bullet list with no
    * status column, and backlog.md has no status field — so no cascade
-   * beyond the task file itself. Item status is derived at read time.
-   *
+   * beyond the task file itself. at read time.
+ Item status is derived   *
    * @param taskId    - The task source path, e.g. "work/my-feature/003-task.md",
    *                    or "itemSlug/priority" format, e.g. "my-feature/003"
    * @param newStatus - The new task status
@@ -104,9 +97,7 @@ export class BacklogDocument {
   changeTaskStatus(taskId: string, newStatus: TaskStatus): Changeset {
     // Find the task by source path or itemSlug/priority
     const task = this._model.tasks.find(
-      (t) =>
-        t.source === taskId ||
-        `${t.itemSlug}/${t.priority}` === taskId,
+      (t) => t.source === taskId || `${t.itemSlug}/${t.priority}` === taskId,
     );
 
     if (!task) {
@@ -132,7 +123,7 @@ export class BacklogDocument {
       throw new Error(`Task file "${task.source}" not found in cache`);
     }
 
-    const taskPatch = patchMetadataField(taskFileContent, "Status", newStatus);
+    const taskPatch = patchMetadataField(taskFileContent, "s", newStatus);
     patches.push({
       filePath: task.source,
       original: taskPatch.original,
@@ -141,9 +132,7 @@ export class BacklogDocument {
     });
 
     // Update model: task status
-    const modelTask = modelAfter.tasks.find(
-      (t) => t.source === task.source,
-    )!;
+    const modelTask = modelAfter.tasks.find((t) => t.source === task.source)!;
     modelTask.status = newStatus;
 
     return {

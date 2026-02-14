@@ -7,6 +7,7 @@ export function Column({
   color,
   items,
   onAdd,
+  onAddTask,
   onItemSelect,
 }: {
   title: string;
@@ -14,6 +15,7 @@ export function Column({
   color: string;
   items: DisplayItem[];
   onAdd?: () => void;
+  onAddTask?: () => void;
   onItemSelect: (item: DisplayItem) => void;
 }) {
   return (
@@ -27,8 +29,17 @@ export function Column({
         {onAdd && (
           <button
             onClick={onAdd}
-            className="ml-1 w-6 h-6 flex items-center justify-center rounded-full text-slate-400 hover:text-blue-600 hover:bg-white/80 transition-colors text-lg leading-none"
-            aria-label="Add work"
+            className="w-6 h-6 flex items-center justify-center rounded-full text-slate-400 hover:text-blue-600 hover:bg-white/80 transition-colors text-lg leading-none"
+            aria-label="Add item"
+          >
+            +
+          </button>
+        )}
+        {onAddTask && (
+          <button
+            onClick={onAddTask}
+            className="w-6 h-6 flex items-center justify-center rounded-full text-slate-400 hover:text-green-600 hover:bg-white/80 transition-colors text-sm leading-none"
+            aria-label="Add task"
           >
             +
           </button>
@@ -39,11 +50,7 @@ export function Column({
           <p className="text-slate-400 text-sm py-4 text-center">No items</p>
         ) : (
           items.map((item) => (
-            <ItemCard
-              key={item.slug}
-              item={item}
-              onClick={() => onItemSelect(item)}
-            />
+            <ItemCard key={item.slug} item={item} onClick={() => onItemSelect(item)} />
           ))
         )}
       </div>

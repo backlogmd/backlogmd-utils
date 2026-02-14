@@ -4,11 +4,11 @@ import { buildBacklogOutput, serializeOutput } from "@backlogmd/parser";
 
 const FIXTURES = path.resolve(__dirname, "fixtures");
 
-describe("integration: happy-path fixture (SPEC v2)", () => {
+describe("integration: happy-path fixture (SPEC v3)", () => {
   const output = buildBacklogOutput(path.join(FIXTURES, "happy-path"));
 
   it("has correct protocol version", () => {
-    expect(output.protocol).toBe("backlogmd/v2");
+    expect(output.protocol).toBe("backlogmd/v3");
   });
 
   it("parses one backlog entry with type", () => {
@@ -28,24 +28,40 @@ describe("integration: happy-path fixture (SPEC v2)", () => {
     expect(item.tasks[1].slug).toBe("002-add-login");
   });
 
-  it("parses two tasks with correct data", () => {
+  it("parses two tasks with correct v3 data", () => {
     expect(output.tasks).toHaveLength(2);
 
-    const t1 = output.tasks.find((t) => t.priority === "001")!;
+    const t1 = output.tasks.find((t) => t.tid === "001")!;
     expect(t1.name).toBe("Setup project");
     expect(t1.status).toBe("done");
+    expect(t1.priority).toBe(5);
     expect(t1.itemSlug).toBe("001-feat-my-feature");
     expect(t1.dependsOn).toEqual([]);
+    expect(t1.agent).toBe("");
+    expect(t1.humanReview).toBe(false);
+    expect(t1.expiresAt).toBeNull();
     expect(t1.acceptanceCriteria).toHaveLength(2);
     expect(t1.acceptanceCriteria.every((ac) => ac.checked)).toBe(true);
 
-    const t2 = output.tasks.find((t) => t.priority === "002")!;
+    const t2 = output.tasks.find((t) => t.tid === "002")!;
     expect(t2.name).toBe("Add login");
-    expect(t2.status).toBe("in-progress");
-    expect(t2.dependsOn).toEqual(["001-setup-project"]);
+    expect(t2.status).toBe("ip");
+    expect(t2.priority).toBe(10);
+    expect(t2.dependsOn).toEqual(["001"]);
+    expect(t2.agent).toBe("agent-1");
+    expect(t2.humanReview).toBe(true);
+    expect(t2.expiresAt).toBeNull();
     expect(t2.acceptanceCriteria).toHaveLength(3);
     expect(t2.acceptanceCriteria[0].checked).toBe(true);
     expect(t2.acceptanceCriteria[1].checked).toBe(false);
+  });
+
+  it("parses manifest.json", () => {
+    expect(output.manifest).not.toBeNull();
+    expect(output.manifest!.specVersion).toBe("3.0.0");
+    expect(output.manifest!.openItemCount).toBe(1);
+    expect(output.manifest!.items).toHaveLength(1);
+    expect(output.manifest!.items[0].tasks).toHaveLength(2);
   });
 
   it("has no validation errors", () => {
@@ -54,14 +70,15 @@ describe("integration: happy-path fixture (SPEC v2)", () => {
 
   it("serializes to valid JSON", () => {
     const json = JSON.parse(serializeOutput(output));
-    expect(json.protocol).toBe("backlogmd/v2");
+    expect(json.protocol).toBe("backlogmd/v3");
     expect(json.entries).toHaveLength(1);
     expect(json.items).toHaveLength(1);
     expect(json.tasks).toHaveLength(2);
+    expect(json.manifest).not.toBeNull();
   });
 });
 
-describe("integration: with-warnings fixture (SPEC v2)", () => {
+describe("integration: with-warnings fixture (SPEC v3)", () => {
   const output = buildBacklogOutput(path.join(FIXTURES, "with-warnings"));
 
   it("parses entry and tasks", () => {

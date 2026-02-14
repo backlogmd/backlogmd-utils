@@ -25,7 +25,10 @@ export function watchBacklogDir(
   };
 
   watcher = watch(dirPath, { recursive: true }, (eventType, fileName) => {
-    if (fileName && (fileName.endsWith(".md") || fileName.endsWith(".MD"))) {
+    if (
+      fileName &&
+      (fileName.endsWith(".md") || fileName.endsWith(".MD") || fileName === "manifest.json")
+    ) {
       scheduleCallback();
     }
   });

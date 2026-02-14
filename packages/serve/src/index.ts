@@ -1,6 +1,6 @@
 import path from "node:path";
 import { watchBacklogDir } from "./watcher.js";
-import { createServer } from "./server.js";
+import { createServer, type ServerResult } from "./server.js";
 
 export { createServer } from "./server.js";
 export type { ServerResult } from "./server.js";
@@ -17,19 +17,25 @@ export interface ServerHandle {
 
 export function startServer(options: ServerOptions = {}): ServerHandle {
   const cwd = process.cwd();
-  const dir = path.resolve(options.dir || path.join(cwd, ".backlogmd"));
+  let dir = path.resolve(options.dir || path.join(cwd, ".backlogmd"));
+  if (!dir.endsWith(".backlogmd")) {
+    dir = path.join(dir, ".backlogmd");
+  }
   const port = options.port || 3000;
-  const host = options.host || "localhost";
 
-  const { server, notifyClients, close: closeServer } = createServer(port, dir);
+  const serverResult = createServer(port, dir);
 
-  const watcher = watchBacklogDir(dir, () => {
-    notifyClients();
+  const watcher = watchBacklogDir(dir, async () => {
+    try {
+      await serverResult.notifyClients();
+    } catch (err) {
+      console.error("[watcher] Error reloading core:", err);
+    }
   });
 
   const close = () => {
     watcher.close();
-    closeServer();
+    serverResult.close();
   };
 
   return { close };

@@ -14,11 +14,19 @@ export function ItemDetailModal({
   item,
   onClose,
   onTaskStatusChange,
+  onTaskDelete,
+  onItemDelete,
+  onItemReset,
+  onTaskEdit,
   pendingTasks,
 }: {
   item: DisplayItem;
   onClose: () => void;
   onTaskStatusChange: (taskSource: string, newStatus: string) => void;
+  onTaskDelete: (taskSource: string) => void;
+  onItemDelete: () => void;
+  onItemReset: () => void;
+  onTaskEdit?: (taskSource: string) => void;
   pendingTasks: Set<string>;
 }) {
   // Close on Escape
@@ -30,10 +38,8 @@ export function ItemDetailModal({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // Sort tasks by priority
-  const sortedTasks = [...item.tasks].sort((a, b) =>
-    a.priority.localeCompare(b.priority),
-  );
+  // Sort tasks by priority (lower number = higher priority)
+  const sortedTasks = [...item.tasks].sort((a, b) => a.priority - b.priority);
 
   const completed = item.tasks.filter((t) => t.status === "done").length;
 
@@ -49,9 +55,7 @@ export function ItemDetailModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div className="flex items-center gap-2.5 min-w-0">
-            <h3 className="text-lg font-semibold text-slate-800 truncate">
-              {item.name}
-            </h3>
+            <h3 className="text-lg font-semibold text-slate-800 truncate">{item.name}</h3>
             {item.type && (
               <span
                 className={`shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded ${typeColorMap[item.type] ?? typeColorMap.chore}`}
@@ -62,14 +66,31 @@ export function ItemDetailModal({
             )}
             <StatusBadge status={item.status} />
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors text-xl leading-none p-1 shrink-0 ml-3"
-            aria-label="Close"
-            data-testid="close-button"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2 shrink-0 ml-3">
+            <button
+              onClick={onItemReset}
+              className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors text-sm px-2 py-1 rounded"
+              aria-label="Reset all tasks to open"
+              title="Reset all tasks to open"
+            >
+              ↺ Open
+            </button>
+            <button
+              onClick={onItemDelete}
+              className="text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors text-sm px-2 py-1 rounded"
+              aria-label="Delete item"
+            >
+              🗑️
+            </button>
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-600 transition-colors text-xl leading-none p-1 shrink-0"
+              aria-label="Close"
+              data-testid="close-button"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -82,9 +103,7 @@ export function ItemDetailModal({
           </div>
 
           {sortedTasks.length === 0 ? (
-            <p className="text-slate-400 text-sm py-4 text-center">
-              No tasks
-            </p>
+            <p className="text-slate-400 text-sm py-4 text-center">No tasks</p>
           ) : (
             <div className="divide-y divide-slate-100">
               {sortedTasks.map((task) => (
@@ -92,6 +111,8 @@ export function ItemDetailModal({
                   key={task.slug}
                   task={task}
                   onStatusChange={onTaskStatusChange}
+                  onDelete={onTaskDelete}
+                  onEdit={onTaskEdit}
                   isPending={pendingTasks.has(task.source)}
                 />
               ))}

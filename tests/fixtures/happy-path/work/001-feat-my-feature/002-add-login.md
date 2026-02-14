@@ -1,26 +1,25 @@
 <!-- METADATA -->
 
-```
-Task: Add login
-Status: in-progress
-Priority: 002
-DependsOn: [001-setup-project](001-setup-project.md)
+```yaml
+t: Add login
+s: ip
+p: 10
+dep: ["001"]
+a: "agent-1"
+h: true
+expiresAt: null
 ```
 
-<!-- /METADATA -->
 <!-- DESCRIPTION -->
 
 ## Description
 
 Implement the login flow with email and password.
 
-<!-- /DESCRIPTION -->
-<!-- ACCEPTANCE CRITERIA -->
+<!-- ACCEPTANCE -->
 
 ## Acceptance criteria
 
 - [x] Login form renders
 - [ ] Auth token is stored
 - [ ] Redirect after login
-
-<!-- /ACCEPTANCE CRITERIA -->

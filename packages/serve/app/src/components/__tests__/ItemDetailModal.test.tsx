@@ -7,12 +7,12 @@ function makeItem(overrides: Record<string, unknown> = {}) {
     slug: "001-feat-my-feature",
     name: "My Feature",
     type: "feat" as string | null,
-    status: "in-progress",
+    status: "ip",
     tasks: [
       {
         name: "Add login",
-        status: "in-progress",
-        priority: "002",
+        status: "ip",
+        priority: 2,
         slug: "002-add-login",
         itemSlug: "001-feat-my-feature",
         dependsOn: ["001-setup-project"],
@@ -23,7 +23,7 @@ function makeItem(overrides: Record<string, unknown> = {}) {
       {
         name: "Setup project",
         status: "done",
-        priority: "001",
+        priority: 1,
         slug: "001-setup-project",
         itemSlug: "001-feat-my-feature",
         dependsOn: [],
@@ -82,7 +82,7 @@ describe("ItemDetailModal", () => {
   it("renders status badge", () => {
     const { container } = render(
       <ItemDetailModal
-        item={makeItem({ status: "in-progress" })}
+        item={makeItem({ status: "ip" })}
         onClose={() => {}}
         onTaskStatusChange={() => {}}
         pendingTasks={new Set()}
@@ -186,9 +186,7 @@ describe("ItemDetailModal", () => {
 
     // The footer close button is the one with text "Close"
     const buttons = container.querySelectorAll("button");
-    const closeBtn = Array.from(buttons).find(
-      (b) => b.textContent === "Close",
-    )!;
+    const closeBtn = Array.from(buttons).find((b) => b.textContent === "Close")!;
     fireEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -204,18 +202,13 @@ describe("ItemDetailModal", () => {
       />,
     );
 
-    // The "Add login" task (in-progress) should have a "Mark done" button
+    // The "Add login" task (ip) should have a "Mark done" button
     const buttons = container.querySelectorAll("button");
-    const markDoneBtn = Array.from(buttons).find(
-      (b) => b.textContent === "Mark done",
-    )!;
+    const markDoneBtn = Array.from(buttons).find((b) => b.textContent === "Mark done")!;
     fireEvent.click(markDoneBtn);
 
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange).toHaveBeenCalledWith(
-      "work/001-feat-my-feature/002-add-login.md",
-      "done",
-    );
+    expect(onChange).toHaveBeenCalledWith("work/001-feat-my-feature/002-add-login.md", "done");
   });
 
   it("shows 'No tasks' when item has no tasks", () => {

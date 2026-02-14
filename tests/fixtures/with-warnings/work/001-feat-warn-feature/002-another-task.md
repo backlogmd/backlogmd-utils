@@ -1,24 +1,23 @@
 <!-- METADATA -->
 
-```
-Task: Another task
-Status: open
-Priority: 002
-DependsOn: —
+```yaml
+t: Another task
+s: open
+p: 10
+dep: []
+a: ""
+h: false
+expiresAt: null
 ```
 
-<!-- /METADATA -->
 <!-- DESCRIPTION -->
 
 ## Description
 
 A secondary task for the warning feature.
 
-<!-- /DESCRIPTION -->
-<!-- ACCEPTANCE CRITERIA -->
+<!-- ACCEPTANCE -->
 
 ## Acceptance criteria
 
 - [ ] Criterion one
-
-<!-- /ACCEPTANCE CRITERIA -->
