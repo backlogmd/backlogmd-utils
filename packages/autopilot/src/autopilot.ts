@@ -93,7 +93,6 @@ export class Autopilot {
     }
 
     console.error(`[autopilot] Task "${taskId}" not found`);
-    process.exit(1);
   }
 
   async runTaskById(taskId: string): Promise<void> {
@@ -125,7 +124,6 @@ export class Autopilot {
     }
 
     console.error(`[autopilot] Task "${taskId}" not found`);
-    process.exit(1);
   }
 
   async executePrompt(prompt: string): Promise<void> {
