@@ -63,36 +63,39 @@ export class Autopilot {
     console.log(`[autopilot] Task ${taskId} not found or not in plan status`);
   }
 
-  async runWorkById(taskId: string): Promise<void> {
+  async runWorkById(workIdentifier: string): Promise<void> {
     const manifest = this.core.getManifest();
 
-    for (const item of manifest.items) {
-      const task = item.tasks.find(
-        (t) =>
-          t.tid === taskId ||
-          t.slug === taskId ||
-          t.file === taskId ||
-          t.t.toLowerCase() === taskId.toLowerCase(),
-      );
-      if (task) {
-        const source = `${item.path}/${task.file}`;
-        const content = await this.core.getTaskContent(source);
+    const item = manifest.items.find(
+      (i) =>
+        i.id === workIdentifier ||
+        i.slug === workIdentifier ||
+        i.id + "-" + i.slug === workIdentifier ||
+        i.slug.toLowerCase() === workIdentifier.toLowerCase(),
+    );
 
-        const agentTask: AgentTask = {
-          id: task.tid,
-          title: content.title,
-          description: content.description,
-          acceptanceCriteria: content.acceptanceCriteria,
-          source,
-          executeOnly: true,
-        };
-
-        await this.executeTask(agentTask);
-        return;
-      }
+    if (!item) {
+      console.error(`[autopilot] Work "${workIdentifier}" not found`);
+      return;
     }
 
-    console.error(`[autopilot] Task "${taskId}" not found`);
+    console.log(`[autopilot] Executing work: ${item.slug}`);
+
+    for (const task of item.tasks) {
+      const source = `${item.path}/${task.file}`;
+      const content = await this.core.getTaskContent(source);
+
+      const agentTask: AgentTask = {
+        id: task.tid,
+        title: content.title,
+        description: content.description,
+        acceptanceCriteria: content.acceptanceCriteria,
+        source,
+        executeOnly: true,
+      };
+
+      await this.executeTask(agentTask);
+    }
   }
 
   async runTaskById(taskId: string): Promise<void> {
