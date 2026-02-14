@@ -1,7 +1,7 @@
 import type { ItemStatus, TaskStatus } from "@backlogmd/types";
 
 /**
- * Derive an item's status from its tasks per SPEC v2:
+ * Derive an item's status from its tasks per SPEC v3:
  * - No tasks → open
  * - All tasks done → done
  * - All tasks open → open

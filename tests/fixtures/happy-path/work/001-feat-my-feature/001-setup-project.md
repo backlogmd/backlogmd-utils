@@ -1,25 +1,24 @@
 <!-- METADATA -->
 
-```
-Task: Setup project
-Status: done
-Priority: 001
-DependsOn: —
+```yaml
+t: Setup project
+s: done
+p: 5
+dep: []
+a: ""
+h: false
+expiresAt: null
 ```
 
-<!-- /METADATA -->
 <!-- DESCRIPTION -->
 
 ## Description
 
 Bootstrap the project with all necessary tooling.
 
-<!-- /DESCRIPTION -->
-<!-- ACCEPTANCE CRITERIA -->
+<!-- ACCEPTANCE -->
 
 ## Acceptance criteria
 
 - [x] Project compiles
 - [x] Tests pass
-
-<!-- /ACCEPTANCE CRITERIA -->

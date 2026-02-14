@@ -1,14 +1,20 @@
 const colorMap: Record<string, string> = {
+  plan: "bg-slate-100 text-slate-600",
   open: "bg-badge-todo-bg text-badge-todo-text",
+  reserved: "bg-purple-100 text-purple-700",
+  ip: "bg-badge-wip-bg text-badge-wip-text",
+  review: "bg-amber-100 text-amber-700",
   block: "bg-red-100 text-red-700",
-  "in-progress": "bg-badge-wip-bg text-badge-wip-text",
   done: "bg-badge-done-bg text-badge-done-text",
 };
 
 const labelMap: Record<string, string> = {
+  plan: "Plan",
   open: "Open",
+  reserved: "Reserved",
+  ip: "In Progress",
+  review: "Review",
   block: "Blocked",
-  "in-progress": "In Progress",
   done: "Done",
 };
 

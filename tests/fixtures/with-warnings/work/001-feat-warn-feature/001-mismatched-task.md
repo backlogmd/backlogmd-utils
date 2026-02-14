@@ -1,24 +1,23 @@
 <!-- METADATA -->
 
-```
-Task: Mismatched task
-Status: in-progress
-Priority: 001
-DependsOn: —
+```yaml
+t: Mismatched task
+s: ip
+p: 5
+dep: []
+a: "agent-1"
+h: false
+expiresAt: null
 ```
 
-<!-- /METADATA -->
 <!-- DESCRIPTION -->
 
 ## Description
 
 A task with a status mismatch for testing.
 
-<!-- /DESCRIPTION -->
-<!-- ACCEPTANCE CRITERIA -->
+<!-- ACCEPTANCE -->
 
 ## Acceptance criteria
 
 - [ ] Criterion one
-
-<!-- /ACCEPTANCE CRITERIA -->

@@ -35,7 +35,7 @@ export function parseArgs(argv: string[]): CliArgs {
         }
         args.dir = path.resolve(argv[++i]);
         break;
-      case "--port":
+      case "--port": {
         if (i + 1 >= argv.length) {
           throw new Error("--port requires a port argument");
         }
@@ -45,6 +45,7 @@ export function parseArgs(argv: string[]): CliArgs {
         }
         args.port = port;
         break;
+      }
       case "--host":
         if (i + 1 >= argv.length) {
           throw new Error("--host requires a host argument");

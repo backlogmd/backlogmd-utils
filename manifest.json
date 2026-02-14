@@ -1,0 +1,31 @@
+{
+  "specVersion": "3.0.0",
+  "updatedAt": "2026-02-13T22:41:07.555Z",
+  "openItemCount": 3,
+  "items": [
+    {
+      "id": "001",
+      "slug": "001-test-item",
+      "path": "work/001-test-item",
+      "status": "open",
+      "updated": "2026-02-13T22:29:54.191Z",
+      "tasks": []
+    },
+    {
+      "id": "002",
+      "slug": "002-new-test-item",
+      "path": "work/002-new-test-item",
+      "status": "open",
+      "updated": "2026-02-13T22:39:20.242Z",
+      "tasks": []
+    },
+    {
+      "id": "003",
+      "slug": "003-fresh-test-item",
+      "path": "work/003-fresh-test-item",
+      "status": "open",
+      "updated": "2026-02-13T22:41:07.554Z",
+      "tasks": []
+    }
+  ]
+}

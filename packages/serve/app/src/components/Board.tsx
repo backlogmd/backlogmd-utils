@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { Column } from "./Column";
 import { AddWorkModal } from "./AddWorkModal";
+import { AddPlanModal } from "./AddPlanModal";
 import { ItemDetailModal } from "./ItemDetailModal";
+import { EditTaskModal } from "./EditTaskModal";
 import { useTaskStatusUpdate } from "../hooks/useTaskStatusUpdate";
 
 interface TaskRef {
@@ -18,7 +20,7 @@ interface ItemFolder {
 interface Task {
   name: string;
   status: string;
-  priority: string;
+  priority: number;
   slug: string;
   itemSlug: string;
   dependsOn: string[];
@@ -38,7 +40,8 @@ function deriveStatus(taskStatuses: string[]): string {
   if (taskStatuses.length === 0) return "open";
   if (taskStatuses.every((s) => s === "done")) return "done";
   if (taskStatuses.every((s) => s === "open")) return "open";
-  return "in-progress";
+  if (taskStatuses.every((s) => s === "plan")) return "plan";
+  return "ip";
 }
 
 /** Convert a slug like "001-feat-user-auth" to a display name. */
@@ -63,15 +66,55 @@ export interface DisplayItem {
 }
 
 const columns = [
+  { id: "plan", title: "Plan", color: "bg-slate-100", icon: "○" },
   { id: "open", title: "Open", color: "bg-col-todo", icon: "○" },
-  { id: "in-progress", title: "In Progress", color: "bg-col-inprogress", icon: "◐" },
+  { id: "reserved", title: "Reserved", color: "bg-purple-100", icon: "◐" },
+  { id: "ip", title: "In Progress", color: "bg-col-inprogress", icon: "◐" },
+  { id: "review", title: "Review", color: "bg-amber-100", icon: "◑" },
+  { id: "block", title: "Blocked", color: "bg-red-100", icon: "⊘" },
   { id: "done", title: "Done", color: "bg-col-done", icon: "●" },
 ] as const;
 
 export function Board({ data, searchQuery = "" }: { data: BacklogData; searchQuery?: string }) {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddPlanModal, setShowAddPlanModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<DisplayItem | null>(null);
-  const { updateTaskStatus, pendingTasks } = useTaskStatusUpdate();
+  const [editingTask, setEditingTask] = useState<string | null>(null);
+  const { updateTaskStatus, deleteTask, pendingTasks } = useTaskStatusUpdate();
+
+  const deleteItem = async (itemSlug: string) => {
+    try {
+      const encodedSlug = encodeURIComponent(itemSlug);
+      const res = await fetch(`/api/work/${encodedSlug}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err);
+      }
+    } catch (err) {
+      console.error("[backlogmd] Failed to delete item:", err);
+      alert("Failed to delete item");
+    }
+  };
+
+  const resetItemTasks = async (itemSlug: string) => {
+    console.log("[resetItemTasks] Called with slug:", itemSlug);
+    try {
+      const encodedSlug = encodeURIComponent(itemSlug);
+      const res = await fetch(`/api/work/${encodedSlug}/reset`, {
+        method: "PATCH",
+      });
+      const text = await res.text();
+      console.log("[resetItemTasks] Response:", res.status, text);
+      if (!res.ok) {
+        throw new Error(text);
+      }
+    } catch (err) {
+      console.error("[backlogmd] Failed to reset item tasks:", err);
+      alert(`Failed to reset item tasks: ${err instanceof Error ? err.message : "Unknown error"}`);
+    }
+  };
 
   // Build display items from entries + items + tasks
   const displayItems: DisplayItem[] = [];
@@ -110,8 +153,12 @@ export function Board({ data, searchQuery = "" }: { data: BacklogData; searchQue
     : displayItems;
 
   const byStatus: Record<string, DisplayItem[]> = {
+    plan: [],
     open: [],
-    "in-progress": [],
+    reserved: [],
+    ip: [],
+    review: [],
+    block: [],
     done: [],
   };
 
@@ -122,8 +169,51 @@ export function Board({ data, searchQuery = "" }: { data: BacklogData; searchQue
   }
 
   const handleAddWork = (content: string) => {
-    console.log("[backlogmd] Submitted work:\n", content);
     setShowAddModal(false);
+  };
+
+  const handleAddPlan = async (title: string, description: string) => {
+    try {
+      const res = await fetch("/api/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, description }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err);
+      }
+      setShowAddPlanModal(false);
+    } catch (err) {
+      console.error("[backlogmd] Failed to create plan:", err);
+      alert("Failed to create plan");
+    }
+  };
+
+  const handleEditTask = async (
+    taskSource: string,
+    updates: {
+      title?: string;
+      description?: string;
+      acceptanceCriteria?: { text: string; checked: boolean }[];
+    },
+  ) => {
+    try {
+      const encoded = encodeURIComponent(taskSource);
+      const res = await fetch(`/api/task?source=${encoded}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err);
+      }
+      setEditingTask(null);
+    } catch (err) {
+      console.error("[backlogmd] Failed to edit task:", err);
+      alert("Failed to edit task");
+    }
   };
 
   return (
@@ -136,7 +226,8 @@ export function Board({ data, searchQuery = "" }: { data: BacklogData; searchQue
             icon={col.icon}
             color={col.color}
             items={byStatus[col.id]}
-            onAdd={col.id === "open" ? () => setShowAddModal(true) : undefined}
+            onAdd={col.id === "plan" ? () => setShowAddModal(true) : undefined}
+            onAddTask={col.id === "plan" ? () => setShowAddPlanModal(true) : undefined}
             onItemSelect={setSelectedItem}
           />
         ))}
@@ -144,12 +235,35 @@ export function Board({ data, searchQuery = "" }: { data: BacklogData; searchQue
       {showAddModal && (
         <AddWorkModal onClose={() => setShowAddModal(false)} onSubmit={handleAddWork} />
       )}
+      {showAddPlanModal && (
+        <AddPlanModal onClose={() => setShowAddPlanModal(false)} onSubmit={handleAddPlan} />
+      )}
       {selectedItem && (
         <ItemDetailModal
           item={selectedItem}
           onClose={() => setSelectedItem(null)}
           onTaskStatusChange={updateTaskStatus}
+          onTaskDelete={deleteTask}
+          onItemDelete={() => {
+            if (confirm(`Delete item "${selectedItem.name}" and all its tasks?`)) {
+              deleteItem(selectedItem.slug);
+              setSelectedItem(null);
+            }
+          }}
+          onItemReset={() => {
+            if (confirm(`Reset all tasks in "${selectedItem.name}" to open?`)) {
+              resetItemTasks(selectedItem.slug);
+            }
+          }}
+          onTaskEdit={(taskSource) => setEditingTask(taskSource)}
           pendingTasks={pendingTasks}
+        />
+      )}
+      {editingTask && (
+        <EditTaskModal
+          taskSource={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSave={handleEditTask}
         />
       )}
     </>

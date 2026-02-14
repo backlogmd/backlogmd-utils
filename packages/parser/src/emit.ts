@@ -1,16 +1,24 @@
 import fs from "node:fs";
 import path from "node:path";
-import { parseBacklog } from "./parse-backlog.js";
-import { parseItemIndex } from "./parse-item-index.js";
-import { parseTaskFile } from "./parse-task-file.js";
-import { crossLink } from "./cross-link.js";
-import type { BacklogOutput, BacklogEntry, ItemFolder, Task, ValidationIssue } from "./types.js";
+import { parseBacklog } from "./parsers/parseBacklog.js";
+import { parseItemIndex } from "./parsers/parseItemIndex.js";
+import { parseTaskFile } from "./parsers/parseTaskFile.js";
+import { crossLink } from "./crossLink.js";
+import { parseManifest } from "./parsers/parseManifest.js";
+import type {
+  BacklogOutput,
+  BacklogEntry,
+  ItemFolder,
+  Task,
+  Manifest,
+  ValidationIssue,
+} from "./types.js";
 
 /**
  * Run the full pipeline: read files from rootDir, parse, cross-link, and return
  * the canonical BacklogOutput object.
  *
- * SPEC v2: reads from work/ directory (not items/).
+ * SPEC v3: reads from work/ directory, optionally reads manifest.json.
  *
  * Individual parse errors are collected as validation errors rather than
  * throwing — a malformed task file won't prevent the rest of the backlog
@@ -35,7 +43,26 @@ export function buildBacklogOutput(rootDir: string): BacklogOutput {
     });
   }
 
-  // 2. Discover and parse item folders from work/
+  // 2. Parse manifest.json (optional)
+  let manifest: Manifest | null = null;
+  const manifestWarnings: ValidationIssue[] = [];
+  const manifestPath = path.join(absRoot, "manifest.json");
+  if (fs.existsSync(manifestPath)) {
+    try {
+      const manifestContent = fs.readFileSync(manifestPath, "utf-8");
+      const result = parseManifest(manifestContent, "manifest.json");
+      manifest = result.manifest;
+      manifestWarnings.push(...result.warnings);
+    } catch (err) {
+      parseErrors.push({
+        code: "MANIFEST_PARSE_ERROR",
+        message: `Failed to parse manifest.json: ${(err as Error).message}`,
+        source: "manifest.json",
+      });
+    }
+  }
+
+  // 3. Discover and parse item folders from work/
   const workDir = path.join(absRoot, "work");
   const itemFolders: ItemFolder[] = [];
   const tasks: Task[] = [];
@@ -69,7 +96,7 @@ export function buildBacklogOutput(rootDir: string): BacklogOutput {
 
       itemFolders.push(folder);
 
-      // 3. Parse task files listed in the item index
+      // 4. Parse task files listed in the item index
       for (const ref of folder.tasks) {
         const taskPath = path.join(itemDir, ref.fileName);
         if (!fs.existsSync(taskPath)) continue;
@@ -91,20 +118,21 @@ export function buildBacklogOutput(rootDir: string): BacklogOutput {
     }
   }
 
-  // 4. Cross-link
+  // 5. Cross-link
   const linkResult = crossLink(entries, itemFolders, tasks);
 
-  // 5. Build output — merge parse errors with cross-link errors
+  // 6. Build output — merge parse errors with cross-link errors
   return {
-    protocol: "backlogmd/v2",
+    protocol: "backlogmd/v3",
     generatedAt: new Date().toISOString(),
     rootDir: absRoot,
     entries: linkResult.entries,
     items: itemFolders,
     tasks,
+    manifest,
     validation: {
       errors: [...parseErrors, ...linkResult.errors],
-      warnings: linkResult.warnings,
+      warnings: [...linkResult.warnings, ...manifestWarnings],
     },
   };
 }
@@ -119,7 +147,10 @@ export function serializeOutput(output: BacklogOutput): string {
 /**
  * Write the output to a file or return as string.
  */
-export function writeOutput(output: BacklogOutput, outputPath?: string): string {
+export function writeOutput(
+  output: BacklogOutput,
+  outputPath?: string,
+): string {
   const json = serializeOutput(output);
   if (outputPath) {
     fs.writeFileSync(outputPath, json, "utf-8");

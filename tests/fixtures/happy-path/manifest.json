@@ -1,0 +1,40 @@
+{
+  "specVersion": "3.0.0",
+  "updatedAt": "2026-02-13T12:00:00Z",
+  "openItemCount": 1,
+  "items": [
+    {
+      "id": "001",
+      "slug": "feat-my-feature",
+      "path": "work/001-feat-my-feature",
+      "status": "open",
+      "updated": "2026-02-13T11:59:00Z",
+      "tasks": [
+        {
+          "tid": "001",
+          "slug": "setup-project",
+          "file": "001-setup-project.md",
+          "t": "Setup project",
+          "s": "done",
+          "p": 5,
+          "dep": [],
+          "a": "",
+          "h": false,
+          "expiresAt": null
+        },
+        {
+          "tid": "002",
+          "slug": "add-login",
+          "file": "002-add-login.md",
+          "t": "Add login",
+          "s": "ip",
+          "p": 10,
+          "dep": ["001"],
+          "a": "agent-1",
+          "h": true,
+          "expiresAt": null
+        }
+      ]
+    }
+  ]
+}

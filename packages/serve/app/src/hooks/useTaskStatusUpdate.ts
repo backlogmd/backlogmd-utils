@@ -22,8 +22,7 @@ export function useTaskStatusUpdate() {
           throw new Error(body || `HTTP ${res.status}`);
         }
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Unknown error";
+        const message = err instanceof Error ? err.message : "Unknown error";
         setError(message);
       } finally {
         setPendingTasks((prev) => {
@@ -36,5 +35,31 @@ export function useTaskStatusUpdate() {
     [],
   );
 
-  return { updateTaskStatus, pendingTasks, error };
+  const deleteTask = useCallback(async (taskSource: string): Promise<void> => {
+    setError(null);
+    setPendingTasks((prev) => new Set(prev).add(taskSource));
+
+    try {
+      const encodedSource = encodeURIComponent(taskSource);
+      const res = await fetch(`/api/tasks/${encodedSource}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(body || `HTTP ${res.status}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(message);
+    } finally {
+      setPendingTasks((prev) => {
+        const next = new Set(prev);
+        next.delete(taskSource);
+        return next;
+      });
+    }
+  }, []);
+
+  return { updateTaskStatus, deleteTask, pendingTasks, error };
 }

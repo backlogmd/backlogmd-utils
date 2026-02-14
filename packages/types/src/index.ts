@@ -2,6 +2,7 @@
 export type {
   TaskStatus,
   ItemStatus,
+  ManifestItemStatus,
   ItemType,
   BacklogEntry,
   ItemFolder,
@@ -9,5 +10,8 @@ export type {
   Task,
   AcceptanceCriterion,
   ValidationIssue,
+  ManifestTask,
+  ManifestItem,
+  Manifest,
   BacklogOutput,
 } from "./types.js";

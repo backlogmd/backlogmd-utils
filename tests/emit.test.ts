@@ -4,23 +4,24 @@ import type { BacklogOutput } from "@backlogmd/parser";
 
 function makeOutput(overrides: Partial<BacklogOutput> = {}): BacklogOutput {
   return {
-    protocol: "backlogmd/v2",
+    protocol: "backlogmd/v3",
     generatedAt: "2026-01-01T00:00:00.000Z",
     rootDir: "/test/.backlogmd",
     entries: [],
     items: [],
     tasks: [],
+    manifest: null,
     validation: { errors: [], warnings: [] },
     ...overrides,
   };
 }
 
-describe("serializeOutput (SPEC v2)", () => {
+describe("serializeOutput (SPEC v3)", () => {
   it("produces valid JSON with protocol and generatedAt", () => {
     const output = makeOutput();
     const json = JSON.parse(serializeOutput(output));
 
-    expect(json.protocol).toBe("backlogmd/v2");
+    expect(json.protocol).toBe("backlogmd/v3");
     expect(json.generatedAt).toBe("2026-01-01T00:00:00.000Z");
     expect(json.rootDir).toBe("/test/.backlogmd");
   });
@@ -60,16 +61,20 @@ describe("serializeOutput (SPEC v2)", () => {
     expect(json.items[0].tasks[0].slug).toBe("001-setup");
   });
 
-  it("serializes tasks with all fields", () => {
+  it("serializes tasks with all v3 fields", () => {
     const output = makeOutput({
       tasks: [
         {
           name: "Setup",
           status: "done",
-          priority: "001",
+          priority: 5,
+          tid: "001",
           slug: "setup",
           itemSlug: "001-feat-auth",
           dependsOn: [],
+          agent: "",
+          humanReview: false,
+          expiresAt: null,
           description: "Set things up",
           acceptanceCriteria: [
             { text: "Works", checked: true },
@@ -85,10 +90,36 @@ describe("serializeOutput (SPEC v2)", () => {
 
     expect(task.name).toBe("Setup");
     expect(task.status).toBe("done");
+    expect(task.priority).toBe(5);
+    expect(task.tid).toBe("001");
     expect(task.itemSlug).toBe("001-feat-auth");
     expect(task.dependsOn).toEqual([]);
+    expect(task.agent).toBe("");
+    expect(task.humanReview).toBe(false);
+    expect(task.expiresAt).toBeNull();
     expect(task.acceptanceCriteria).toHaveLength(2);
     expect(task.source).toBe("work/001-feat-auth/001-setup.md");
+  });
+
+  it("serializes manifest when present", () => {
+    const output = makeOutput({
+      manifest: {
+        specVersion: "3.0.0",
+        updatedAt: "2026-02-13T12:00:00Z",
+        openItemCount: 1,
+        items: [],
+      },
+    });
+
+    const json = JSON.parse(serializeOutput(output));
+    expect(json.manifest).toBeDefined();
+    expect(json.manifest.specVersion).toBe("3.0.0");
+  });
+
+  it("serializes null manifest", () => {
+    const output = makeOutput({ manifest: null });
+    const json = JSON.parse(serializeOutput(output));
+    expect(json.manifest).toBeNull();
   });
 
   it("serializes validation errors and warnings", () => {

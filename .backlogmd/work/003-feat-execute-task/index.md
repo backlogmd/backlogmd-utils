@@ -1,0 +1,5 @@
+- [add-cli-argument-task-id](001-add-cli-argument-task-id.md)
+- [read-full-task-content](002-read-full-task-content.md)
+- [pass-task-context-to-agent](003-pass-task-context-to-agent.md)
+- [update-task-status-workflow](004-update-task-status-workflow.md)
+- [add-integration-tests](005-add-integration-tests.md)
