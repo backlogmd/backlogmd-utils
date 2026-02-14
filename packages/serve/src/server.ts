@@ -519,7 +519,7 @@ export function createServer(port: number, backlogDir: string): ServerResult {
     reply.status(404).send({ error: "Not Found" });
   });
 
-  fastify.listen({ port }, (err, address) => {
+  fastify.listen({ host: "0.0.0.0", port }, (err, address) => {
     if (err) {
       fastify.log.error(err);
       process.exit(1);
