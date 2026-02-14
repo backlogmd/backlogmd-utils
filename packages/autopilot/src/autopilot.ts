@@ -3,6 +3,7 @@ import { BacklogCore } from "@backlogmd/core";
 import type { CodeAgent, AgentTask, AgentResult } from "./types.js";
 import { OpenCodeAgent } from "./agents/opencode.js";
 import type { VCSProvider, VCSOptions } from "@backlogmd/vcs";
+import path from "node:path";
 
 export class Autopilot {
   private core: BacklogCore;
@@ -12,7 +13,9 @@ export class Autopilot {
 
   constructor(core: BacklogCore, agent?: CodeAgent, vcs?: VCSProvider, vcsOptions?: VCSOptions) {
     this.core = core;
-    this.agent = agent ?? new OpenCodeAgent();
+    const rootDir = core.getRootDir();
+    const cwd = path.dirname(rootDir);
+    this.agent = agent ?? new OpenCodeAgent(undefined, cwd);
     this.vcs = vcs;
     this.vcsOptions = vcsOptions;
   }

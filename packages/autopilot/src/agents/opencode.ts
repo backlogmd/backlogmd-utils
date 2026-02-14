@@ -4,12 +4,13 @@ import http from "node:http";
 import type { CodeAgent, AgentTask, AgentResult } from "../types.js";
 
 const JSON_INSTRUCTION = `
-IMPORTANT: Use the /backlogmd skill to create items and tasks in the backlog.
-- Create items and tasks directly WITHOUT asking for confirmation
-- NEVER ask questions like "Would you like me to create this item?" - just create it
+IMPORTANT: Be proactive and find solutions without human intervention.
+- Do NOT ask for user input or confirmation - proceed autonomously
+- If you encounter issues, try multiple approaches before giving up
+- Use the /backlogmd skill to create items and tasks in the backlog
+- Create items and tasks directly without asking for confirmation
 - If tasks are not correct, delete them and create new ones
 - Execute the plan after creating it
-- Do not ask for user input - proceed autonomously
 
 Before you finish, output a JSON block with the results of this task. Format:
 
@@ -29,9 +30,11 @@ Also, periodically send updates about what you're doing by outputting:
 export class OpenCodeAgent implements CodeAgent {
   name = "opencode";
   private webhookUrl?: string;
+  private cwd?: string;
 
-  constructor(webhookUrl?: string) {
+  constructor(webhookUrl?: string, cwd?: string) {
     this.webhookUrl = webhookUrl;
+    this.cwd = cwd;
   }
 
   private sendMessage(content: string) {
@@ -81,7 +84,7 @@ ${JSON_INSTRUCTION}`;
       // Use --share to auto-confirm actions
       const proc = spawn("opencode", ["run", "--share"], {
         stdio: ["pipe", "pipe", "pipe"],
-        cwd: process.cwd(),
+        cwd: this.cwd ?? process.cwd(),
       });
 
       // Write prompt to stdin

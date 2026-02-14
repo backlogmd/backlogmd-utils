@@ -418,7 +418,8 @@ export function createServer(port: number, backlogDir: string): ServerResult {
               autoReconcile: false,
             });
             const webhookUrl = `http://localhost:${serverPort}/api/chat/message`;
-            const agent = new OpenCodeAgent(webhookUrl);
+            const cwd = path.dirname(backlogDir);
+            const agent = new OpenCodeAgent(webhookUrl, cwd);
             const autopilot = new Autopilot(autopilotCore, agent);
             await autopilot.runPlanTask(taskId);
             notifyClients();
@@ -467,7 +468,8 @@ export function createServer(port: number, backlogDir: string): ServerResult {
           autoReconcile: false,
         });
         const webhookUrl = `http://localhost:${serverPort}/api/chat/message`;
-        const agent = new OpenCodeAgent(webhookUrl);
+        const cwd = path.dirname(backlogDir);
+        const agent = new OpenCodeAgent(webhookUrl, cwd);
         const autopilot = new Autopilot(autopilotCore, agent);
         await autopilot.executePrompt(message);
         notifyClients();

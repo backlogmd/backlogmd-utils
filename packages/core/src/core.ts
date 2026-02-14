@@ -52,6 +52,10 @@ export class BacklogCore {
     return this.manifest;
   }
 
+  getRootDir(): string {
+    return this.rootDir;
+  }
+
   async closeTask(taskId: string): Promise<Manifest> {
     return this.queue.enqueue(async () => {
       const result = closeTask(this.rootDir, this.manifest, taskId);
