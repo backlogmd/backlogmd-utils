@@ -14,6 +14,14 @@ function toKebabCase(str: string): string {
     .toLowerCase();
 }
 
+/** Slug must be a single directory name (no path separators). */
+function toSafeItemSlugSegment(str: string): string {
+  return toKebabCase(str)
+    .replace(/[/\\]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 function getNextItemId(rootDir: string): string {
   const workDir = path.join(path.resolve(rootDir), "work");
   if (!fs.existsSync(workDir)) return "001";
@@ -31,12 +39,17 @@ function getNextItemId(rootDir: string): string {
   return String(maxId + 1).padStart(3, "0");
 }
 
-/** SPEC v4 work item index.md: METADATA (work:, status:), DESCRIPTION, CONTEXT. */
+/** Escape a string for use as a double-quoted YAML value. */
+function yamlQuoted(s: string): string {
+  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"`;
+}
+
+/** SPEC v4 work item index.md: METADATA (work:, status:), DESCRIPTION, CONTEXT. Folder must contain only this file. */
 function renderItemIndexV4(workTitle: string, status: string, description = "", context = ""): string {
   return `<!-- METADATA -->
 
 \`\`\`yaml
-work: ${workTitle}
+work: ${yamlQuoted(workTitle)}
 status: ${status}
 \`\`\`
 
@@ -101,7 +114,8 @@ expiresAt: ${expiresAt}
 }
 
 /**
- * Create a new work item (SPEC v4). Uses parser to derive next id from work/.
+ * Create a new work item (SPEC v4). Creates only work/<slug>/ with a single index.md
+ * containing METADATA (work:, status:), DESCRIPTION, and CONTEXT. No task files.
  * Returns the new item slug and path.
  */
 export function createWorkItem(
@@ -111,7 +125,7 @@ export function createWorkItem(
 ): { slug: string; path: string } {
   const absRoot = path.resolve(rootDir);
   const nextId = getNextItemId(absRoot);
-  const slug = `${nextId}${type ? `-${type}` : ""}-${toKebabCase(title)}`;
+  const slug = `${nextId}${type ? `-${type}` : ""}-${toSafeItemSlugSegment(title)}`;
   const itemPath = `work/${slug}`;
   const absDir = path.join(absRoot, itemPath);
   fs.mkdirSync(absDir, { recursive: true });
@@ -140,7 +154,7 @@ export function createTask(
     ? parseInt(options.tid, 10)
     : tasksForItem.length + 1;
   const nextTid = String(nextNum).padStart(3, "0");
-  const slug = `${nextTid}-${toKebabCase(title)}`;
+  const slug = `${nextTid}-${toSafeItemSlugSegment(title)}`;
   const fileName = `${slug}.md`;
   const taskSource = `${item.source.replace("/index.md", "")}/${fileName}`;
   const taskPath = path.join(absRoot, taskSource);

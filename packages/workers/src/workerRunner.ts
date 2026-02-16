@@ -1,8 +1,9 @@
 import type { BacklogOutput, Task } from "@backlogmd/types";
 import { BacklogCore } from "@backlogmd/core";
-import type { CodeAgent, AgentTask } from "./types.js";
+import type { CodeAgent, AgentTask, WorkerRole } from "./types.js";
 import { OpenCodeAgent } from "./agents/opencode.js";
 import type { VCSProvider, VCSOptions } from "@backlogmd/vcs";
+import fs from "node:fs/promises";
 import path from "node:path";
 
 export class Worker {
@@ -10,12 +11,20 @@ export class Worker {
   private agent: CodeAgent;
   private vcs?: VCSProvider;
   private vcsOptions?: VCSOptions;
+  private role?: WorkerRole;
 
-  constructor(core: BacklogCore, agent?: CodeAgent, vcs?: VCSProvider, vcsOptions?: VCSOptions) {
+  constructor(
+    core: BacklogCore,
+    agent?: CodeAgent,
+    vcs?: VCSProvider,
+    vcsOptions?: VCSOptions,
+    role?: WorkerRole,
+  ) {
     this.core = core;
     const rootDir = core.getRootDir();
     const cwd = path.dirname(rootDir);
-    this.agent = agent ?? new OpenCodeAgent(undefined, cwd);
+    this.role = role;
+    this.agent = agent ?? new OpenCodeAgent(undefined, cwd, role);
     this.vcs = vcs;
     this.vcsOptions = vcsOptions;
   }
@@ -51,6 +60,7 @@ export class Worker {
         description: content.description,
         acceptanceCriteria: content.acceptanceCriteria,
         source: task.source,
+        itemSlug: task.itemSlug,
       };
       await this.executeTask(agentTask);
       return;
@@ -85,10 +95,89 @@ export class Worker {
         description: content.description,
         acceptanceCriteria: content.acceptanceCriteria,
         source: task.source,
-        executeOnly: true,
+        itemSlug: item.slug,
+        executeOnly: false,
       };
       await this.executeTask(agentTask);
     }
+  }
+
+  /**
+   * Run the planner on a work item (no task files yet). Loads the item index,
+   * builds a synthetic plan task, and runs the agent; planner output tasksCreated
+   * are created via core.addTask.
+   */
+  async runPlanningForItem(itemSlug: string): Promise<void> {
+    if (this.role?.id !== "planner") {
+      console.log(`[worker] runPlanningForItem ignored: role is ${this.role?.id ?? "none"}, not planner`);
+      return;
+    }
+
+    const state = this.core.getState();
+    const item = state.items.find(
+      (i) =>
+        i.slug === itemSlug ||
+        i.slug.startsWith(itemSlug + "-") ||
+        i.slug.split("-")[0] === itemSlug,
+    );
+    if (!item) {
+      console.error(`[worker] Work item "${itemSlug}" not found`);
+      return;
+    }
+
+    const indexPath = path.join(this.core.getRootDir(), item.source);
+    let rawContent: string;
+    try {
+      rawContent = await fs.readFile(indexPath, "utf-8");
+    } catch (err) {
+      console.error(`[worker] Failed to read item index ${indexPath}:`, (err as Error).message);
+      return;
+    }
+
+    const { title, description } = this.parseItemIndexContent(rawContent);
+    const agentTask: AgentTask = {
+      id: "plan",
+      title: title || item.slug,
+      description: description || "",
+      acceptanceCriteria: [],
+      source: indexPath,
+      itemSlug: item.slug,
+      executeOnly: true,
+    };
+
+    console.log(`[worker] Running planner on work item: ${item.slug}`);
+    await this.executeTask(agentTask);
+  }
+
+  private parseItemIndexContent(content: string): { title: string; description: string } {
+    const metadataSection = this.extractSection(content, "METADATA");
+    const codeMatch = metadataSection.match(/```[\s\S]*?\n([\s\S]*?)```/);
+    let title = "";
+    if (codeMatch) {
+      for (const line of codeMatch[1].split("\n")) {
+        const colonIndex = line.indexOf(":");
+        if (colonIndex === -1) continue;
+        const key = line.slice(0, colonIndex).trim();
+        const value = line.slice(colonIndex + 1).trim();
+        if (key === "work" && value) {
+          const v = value.trim();
+          title = (v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")) ? v.slice(1, -1) : v;
+          break;
+        }
+      }
+    }
+    const description = this.extractSection(content, "DESCRIPTION");
+    return { title, description };
+  }
+
+  private extractSection(content: string, sectionName: string): string {
+    const startTag = `<!-- ${sectionName} -->`;
+    const startIndex = content.indexOf(startTag);
+    if (startIndex === -1) return "";
+    const from = startIndex + startTag.length;
+    const nextComment = content.indexOf("<!--", from);
+    const endIndex = nextComment === -1 ? content.length : nextComment;
+    return content.slice(from, endIndex).trim();
   }
 
   async runTaskById(taskId: string): Promise<void> {
@@ -113,6 +202,7 @@ export class Worker {
         description: content.description,
         acceptanceCriteria: content.acceptanceCriteria,
         source: task.source,
+        itemSlug: task.itemSlug,
       };
       await this.executeTask(agentTask);
       return;
@@ -144,6 +234,7 @@ export class Worker {
           description: "",
           acceptanceCriteria: [],
           source: t.source,
+          itemSlug: t.itemSlug,
         };
       });
   }
@@ -165,6 +256,20 @@ export class Worker {
       const result = await this.agent.execute(task);
       if (result.success) {
         console.log(`[worker] Task completed successfully`);
+
+        if (this.role?.id === "planner" && task.itemSlug && result.json) {
+          const tasksCreated = (result.json as { tasksCreated?: { title: string; status?: string }[] }).tasksCreated;
+          if (Array.isArray(tasksCreated) && tasksCreated.length > 0) {
+            for (const t of tasksCreated) {
+              const title = t?.title?.trim();
+              if (!title) continue;
+              const status = t.status === "plan" ? "plan" : "open";
+              await this.core.addTask(task.itemSlug, { title, status });
+              console.log(`[worker] Created task: ${title} (${status})`);
+            }
+          }
+        }
+
         if (!isDirect && !isExecuteOnly) {
           await this.core.updateTaskStatus(task.source, "done");
 

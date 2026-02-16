@@ -30,6 +30,8 @@
     "format:check": "prettier --check 'src/**/*.ts'"
   },
   "dependencies": {
+    "@backlogmd/core": "*",
+    "@backlogmd/workers": "*",
     "@langchain/core": "^0.3.0",
     "langchain": "^0.3.0",
     "zod": "^3.24.0"

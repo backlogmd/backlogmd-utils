@@ -6,7 +6,7 @@ import {
 } from "@backlogmd/types";
 import { buildBacklogOutput } from "@backlogmd/parser";
 import type { Changeset, FileCache, FilePatch } from "./types.js";
-import { patchMetadataField } from "./patch.js";
+import { patchMetadataField, patchItemIndexMetadataField } from "./patch.js";
 import { applyChangeset } from "./apply.js";
 
 /**
@@ -191,6 +191,40 @@ export class BacklogDocument {
           original: taskPatch.original,
           replacement: taskPatch.replacement,
           description: `task assignee → ${assignee}`,
+        },
+      ],
+      modelBefore: structuredClone(this._model),
+      modelAfter,
+    };
+  }
+
+  /**
+   * Change a work item's assignee (SPEC v4 item index). Returns a Changeset; call commit() to write.
+   */
+  changeItemAssignee(itemSlug: string, assignee: string): Changeset {
+    const item = this._model.items.find((i) => i.slug === itemSlug);
+    if (!item) throw new Error(`Item "${itemSlug}" not found in the model`);
+    const indexContent = this._cache.get(item.source);
+    if (!indexContent) throw new Error(`Item index "${item.source}" not found in cache`);
+
+    let itemPatch: { patched: string; original: string; replacement: string };
+    try {
+      itemPatch = patchItemIndexMetadataField(indexContent, "assignee", assignee);
+    } catch (e) {
+      throw new Error(`Failed to patch item assignee: ${(e as Error).message}`);
+    }
+
+    const modelAfter: BacklogOutput = structuredClone(this._model);
+    const modelItem = modelAfter.items.find((i) => i.slug === itemSlug)!;
+    modelItem.assignee = assignee;
+
+    return {
+      patches: [
+        {
+          filePath: item.source,
+          original: itemPatch.original,
+          replacement: itemPatch.replacement,
+          description: `item assignee → ${assignee}`,
         },
       ],
       modelBefore: structuredClone(this._model),

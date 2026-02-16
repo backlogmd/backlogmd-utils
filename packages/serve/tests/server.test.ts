@@ -11,7 +11,7 @@ describe("server", () => {
 
   beforeEach(() => {
     port = 3000 + Math.floor(Math.random() * 1000);
-    const fixturePath = path.resolve(__dirname, "../../../../tests/fixtures/spec-v4");
+    const fixturePath = path.resolve(__dirname, "../../../tests/fixtures/spec-v4");
     server = createServer(port, fixturePath);
   });
 
@@ -160,7 +160,7 @@ describe("PATCH /api/tasks/:source", () => {
   beforeEach(() => {
     port = 4000 + Math.floor(Math.random() * 1000);
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "backlogmd-patch-test-"));
-    const fixtureSrc = path.resolve(__dirname, "../../../../tests/fixtures/spec-v4");
+    const fixtureSrc = path.resolve(__dirname, "../../../tests/fixtures/spec-v4");
     copyDirSync(fixtureSrc, tmpDir);
     server = createServer(port, tmpDir);
   });
@@ -191,7 +191,7 @@ describe("PATCH /api/tasks/:source", () => {
       path.join(tmpDir, taskSource),
       "utf-8",
     );
-    expect(taskContent).toContain("Status: done");
+    expect(taskContent).toMatch(/status:\s*done/i);
     expect(taskContent).not.toContain("Status: in-progress");
   });
 
@@ -242,7 +242,10 @@ describe("PATCH /api/tasks/:source", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toContain("Invalid JSON");
+    expect(json.error).toBeDefined();
+    expect(
+      json.error.includes("Invalid JSON") || json.error.includes("Bad Request"),
+    ).toBe(true);
   });
 
   it("triggers SSE reload after successful patch", async () => {

@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
-import type { CodeAgent, AgentTask, AgentResult } from "../types.js";
+import type { CodeAgent, AgentTask, AgentResult, WorkerRole } from "../types.js";
 
-const JSON_INSTRUCTION = `
+const DEFAULT_JSON_INSTRUCTION = `
 IMPORTANT: Be proactive and find solutions without human intervention.
 - Do NOT ask for user input or confirmation - proceed autonomously
 - If you encounter issues, try multiple approaches before giving up
@@ -31,10 +31,12 @@ export class OpenCodeAgent implements CodeAgent {
   name = "opencode";
   private webhookUrl?: string;
   private cwd?: string;
+  private role?: WorkerRole;
 
-  constructor(webhookUrl?: string, cwd?: string) {
+  constructor(webhookUrl?: string, cwd?: string, role?: WorkerRole) {
     this.webhookUrl = webhookUrl;
     this.cwd = cwd;
+    this.role = role;
   }
 
   private sendMessage(content: string) {
@@ -68,21 +70,25 @@ export class OpenCodeAgent implements CodeAgent {
     return new Promise((resolve) => {
       let taskContent = "";
       try {
-        taskContent = fs.readFileSync(task.source, "utf-8");
+        taskContent = task.source ? fs.readFileSync(task.source, "utf-8") : "";
       } catch {
         // Task file might not exist yet
       }
 
-      const prompt = `Task: ${task.title}
+      const jsonInstruction = this.role?.jsonInstruction ?? DEFAULT_JSON_INSTRUCTION;
+      const acceptanceCriteriaStr =
+        task.acceptanceCriteria
+          ?.map((ac) => `- [${ac.checked ? "x" : " "}] ${ac.text}`)
+          .join("\n") ?? "";
 
-${taskContent}
+      const prompt = this.buildPrompt(task, taskContent, acceptanceCriteriaStr, jsonInstruction);
 
-${JSON_INSTRUCTION}`;
+      const args = ["run", "--share"];
+      const plannerModel = process.env.OPENCODE_PLANNER_MODEL ?? "";
+      args.push("--model", plannerModel);
+      console.log("[opencode-agent] Running opencode with", args.join(" "), "...");
 
-      console.log("[opencode-agent] Running opencode with --share...");
-
-      // Use --share to auto-confirm actions
-      const proc = spawn("opencode", ["run", "--share"], {
+      const proc = spawn("opencode", args, {
         stdio: ["pipe", "pipe", "pipe"],
         cwd: this.cwd ?? process.cwd(),
       });
@@ -153,6 +159,30 @@ ${JSON_INSTRUCTION}`;
         });
       });
     });
+  }
+
+  private buildPrompt(
+    task: AgentTask,
+    taskContent: string,
+    acceptanceCriteriaStr: string,
+    jsonInstruction: string,
+  ): string {
+    const r = this.role;
+    const defaultBody = `Task: ${task.title}
+
+${taskContent}
+
+${jsonInstruction}`;
+    const body = r?.taskPromptTemplate
+      ? r.taskPromptTemplate
+          .replace("{title}", task.title)
+          .replace("{description}", task.description ?? "")
+          .replace("{taskContent}", taskContent)
+          .replace("{acceptanceCriteria}", acceptanceCriteriaStr)
+          .replace("{jsonInstruction}", jsonInstruction)
+      : defaultBody;
+    const system = r?.systemPrompt?.trim();
+    return system ? `${system}\n\n---\n\n${body}` : body;
   }
 
   private extractJson(

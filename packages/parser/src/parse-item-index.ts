@@ -60,7 +60,8 @@ function tryParseV4Index(content: string, slug: string, source: string): ItemFol
   if (!codeMatch) return null;
 
   const meta = parseYamlBlock(codeMatch[1]);
-  const work = meta["work"];
+  const workRaw = meta["work"];
+  const work = workRaw !== undefined ? unquote(workRaw) : undefined;
   const statusRaw = (meta["status"] ?? "").trim().toLowerCase();
   if (!work) return null;
 

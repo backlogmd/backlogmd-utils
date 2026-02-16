@@ -1,7 +1,13 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createChatAgent } from "./agent.js";
 import { ServeChatModel } from "./chatModel.js";
 import { HumanMessage } from "@langchain/core/messages";
+import { BacklogCore } from "@backlogmd/core";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const fixturePath = path.resolve(__dirname, "../../../tests/fixtures/spec-v4");
 
 describe("ServeChatModel", () => {
   const baseUrl = "http://localhost:9999";
@@ -76,4 +82,14 @@ describe("createChatAgent", () => {
     expect(result).toBeDefined();
     expect(result.output).toBeDefined();
   }, 10000);
+
+  it("accepts optional core and returns executor without loading from rootDir", async () => {
+    const core = await BacklogCore.load({ rootDir: fixturePath });
+    const executor = await createChatAgent({
+      serveBaseUrl: baseUrl,
+      core,
+    });
+    expect(executor).toBeDefined();
+    expect(typeof executor.invoke).toBe("function");
+  });
 });

@@ -70,10 +70,13 @@ describe("cli parseArgs", () => {
 });
 
 describe("cli run", () => {
-  it("returns 1 when project root has neither .backlogmd nor work/", () => {
+  it("creates .backlogmd/work/ and starts server when neither exists", () => {
     const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), "backlogmd-cli-"));
-    const exitCode = run(["--dir", emptyDir]);
-    fs.rmSync(emptyDir, { recursive: true });
-    expect(exitCode).toBe(1);
+    const port = 3030 + Math.floor(Math.random() * 1000);
+    const exitCode = run(["--dir", emptyDir, "--port", String(port)]);
+    expect(exitCode).toBe(0);
+    expect(fs.existsSync(path.join(emptyDir, ".backlogmd"))).toBe(true);
+    expect(fs.existsSync(path.join(emptyDir, ".backlogmd", "work"))).toBe(true);
+    fs.rmSync(emptyDir, { recursive: true, force: true });
   });
 });

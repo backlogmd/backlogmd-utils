@@ -144,6 +144,16 @@ export class BacklogCore {
     });
   }
 
+  /** Assign a work item to an agent (sets assignee in the item index). */
+  async assignItem(itemSlug: string, agentId: string): Promise<BacklogOutput> {
+    return this.queue.enqueue(async () => {
+      const doc = await BacklogDocument.load(this.rootDir);
+      const changeset = doc.changeItemAssignee(itemSlug, agentId);
+      await doc.commit(changeset);
+      return this.refreshState();
+    });
+  }
+
   async archiveItem(itemSlug: string): Promise<BacklogOutput> {
     return this.queue.enqueue(async () => {
       // Writer does not yet expose archive; for now same as remove or extend writer later

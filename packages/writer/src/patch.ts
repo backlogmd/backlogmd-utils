@@ -74,3 +74,46 @@ export function patchMetadataField(
 
   return { patched, original, replacement };
 }
+
+/**
+ * Patch or add a metadata field in a SPEC v4 item index (work/<slug>/index.md).
+ * The METADATA section has no closing tag; it ends at the next "<!--".
+ * If the field exists, its value is replaced; otherwise the field is added after "status:".
+ */
+export function patchItemIndexMetadataField(
+  content: string,
+  field: string,
+  newValue: string,
+): { patched: string; original: string; replacement: string } {
+  const metaStart = content.indexOf("<!-- METADATA -->");
+  if (metaStart === -1) throw new Error("METADATA section not found in content");
+
+  const afterMeta = content.slice(metaStart + "<!-- METADATA -->".length);
+  const nextComment = afterMeta.indexOf("<!--");
+  const metaSectionEnd =
+    nextComment === -1
+      ? content.length
+      : metaStart + "<!-- METADATA -->".length + nextComment;
+  const metaSection = content.slice(metaStart, metaSectionEnd);
+
+  const escapedField = escapeRegExp(field);
+  const existingPattern = new RegExp(`^(${escapedField}:\\s*).+$`, "m");
+  const match = metaSection.match(existingPattern);
+
+  if (match) {
+    const original = match[0];
+    const replacement = `${match[1]}${newValue}`;
+    const patchedSection = metaSection.replace(original, replacement);
+    const patched = content.replace(metaSection, patchedSection);
+    return { patched, original, replacement };
+  }
+
+  // Add field after status: line (or after the closing ``` of yaml block we don't touch)
+  const statusPattern = /^(status:\s*[\w-]+)\s*$/m;
+  const statusMatch = metaSection.match(statusPattern);
+  const insertAfter = statusMatch ? statusMatch[0] : "```";
+  const newLine = `\n${field}: ${newValue}`;
+  const patchedSection = metaSection.replace(insertAfter, insertAfter + newLine);
+  const patched = content.replace(metaSection, patchedSection);
+  return { patched, original: insertAfter, replacement: insertAfter + newLine };
+}

@@ -91,6 +91,7 @@ export function run(argv: string[]): number {
 
   // Resolve backlog root: directory that contains work/
   // Prefer .backlogmd (project/.backlogmd/work/); fallback to project root (project/work/)
+  // If neither exists, create .backlogmd/work/ and use it
   const dotBacklogmd = path.join(args.rootDir, ".backlogmd");
   const workAtRoot = path.join(args.rootDir, "work");
   let backlogRoot: string;
@@ -99,10 +100,9 @@ export function run(argv: string[]): number {
   } else if (fs.existsSync(workAtRoot)) {
     backlogRoot = args.rootDir;
   } else {
-    console.error(
-      `Error: no backlog found under ${args.rootDir}. Expected either .backlogmd/ (with work/ inside) or a work/ directory.`,
-    );
-    return 1;
+    fs.mkdirSync(path.join(dotBacklogmd, "work"), { recursive: true });
+    backlogRoot = dotBacklogmd;
+    console.error(`Created ${path.join(args.rootDir, ".backlogmd", "work")} (empty backlog).`);
   }
 
   const server = startServer({
