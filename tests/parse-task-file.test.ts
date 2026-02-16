@@ -99,7 +99,7 @@ describe("parseTaskFile (SPEC v2)", () => {
     it("throws when Status field is missing", () => {
       const md = `<!-- METADATA -->\n\n\`\`\`\nTask: Test\nPriority: 001\n\`\`\`\n\n<!-- /METADATA -->`;
       expect(() => parseTaskFile(md, "feat", "work/feat/001-task.md")).toThrow(
-        /missing "Status" field/,
+        /missing "Status" \(or "State"\)/,
       );
     });
   });

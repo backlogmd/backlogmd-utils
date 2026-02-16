@@ -1,16 +1,16 @@
 // ─── Enums / Union types ─────────────────────────────────────────────
 
 /**
- * Valid task statuses per SPEC v2.
- * Flow: open → in-progress → done. Use "block" when a task is blocked.
+ * Valid task statuses per SPEC v4.
+ * plan → open → in-progress → review | done; block from any active state.
  */
-export type TaskStatus = "open" | "block" | "in-progress" | "done";
+export type TaskStatus = "plan" | "open" | "in-progress" | "review" | "block" | "done";
 
 /**
- * Derived item status, computed from its tasks.
- * Not stored in files — backlog.md and index.md have no status fields in SPEC v2.
+ * Item-level status from index.md (SPEC v4).
+ * plan | open | claimed | in-progress | done
  */
-export type ItemStatus = "open" | "in-progress" | "done";
+export type ItemStatus = "plan" | "open" | "claimed" | "in-progress" | "done";
 
 /**
  * Conventional Commits type extracted from an item slug.
@@ -21,75 +21,105 @@ export type ItemType = "feat" | "fix" | "refactor" | "chore";
 // ─── Model interfaces ───────────────────────────────────────────────
 
 /**
- * A backlog entry parsed from backlog.md.
- *
- * SPEC v2 format: `- [<item-slug>](work/<item-slug>/index.md)`
+ * A work item entry (derived from work/ discovery).
  */
 export interface BacklogEntry {
+  /** Item id: leading zero-padded digits from slug (e.g. "001") */
+  id?: string;
   /** The item slug, e.g. "001-feat-project-foundation" */
   slug: string;
   /** Conventional Commits type extracted from the slug, or null if absent */
   type: ItemType | null;
-  /** Source file path relative to .backlogmd/ */
+  /** Item status from index (SPEC v4) or undefined */
+  status?: ItemStatus;
+  /** Item assignee/agent id (SPEC v4); required when status is claimed; empty when open or done */
+  assignee?: string;
+  /** Source file path relative to root (e.g. work/<slug>/index.md) */
   source: string;
 }
 
 /**
  * An item folder parsed from work/<slug>/index.md.
  *
- * SPEC v2 format: bullet list of task file links.
+ * SPEC v4: index has METADATA (work, status), no task list; tasks discovered by listing dir.
+ * Legacy: index may have a bullet list of task file links (v2).
  */
 export interface ItemFolder {
+  /** Item id: leading zero-padded digits from slug (e.g. "001") */
+  id?: string;
   /** The item slug (matches directory name) */
   slug: string;
   /** Conventional Commits type extracted from the slug, or null if absent */
   type: ItemType | null;
-  /** Task references parsed from the bullet list */
+  /** Item status from index (SPEC v4) or undefined if not present */
+  status?: ItemStatus;
+  /** Item assignee/agent id (SPEC v4); non-empty when status is claimed */
+  assignee?: string;
+  /** Task refs: from directory listing (v4) or from index bullet list (v2) */
   tasks: TaskRef[];
-  /** Source file path relative to .backlogmd/ */
+  /** Source file path relative to root (e.g. work/<slug>/index.md) */
   source: string;
 }
 
 /**
- * A task reference from an item's index.md bullet list.
+ * A task reference: from directory listing (v4 <tid>-<slug>.md) or from index.md bullet list (v2).
  */
 export interface TaskRef {
-  /** Task slug from link text, e.g. "001-task-slug" */
+  /** Task slug, e.g. "001-task-slug" (from filename or link text) */
   slug: string;
-  /** File name from link URL, e.g. "001-task-slug.md" */
+  /** File name, e.g. "001-task-slug.md" */
   fileName: string;
 }
 
 /**
  * A full task parsed from its markdown file.
  *
- * SPEC v2 task format uses HTML comment sections with a fenced code block
- * for metadata (Task, Status, Priority, DependsOn).
+ * SPEC v4: METADATA yaml (task, status, priority, dep, assignee, requiresHumanReview, expiresAt).
+ * Legacy: v2 HTML comment / YAML frontmatter (Task, Status, Priority, DependsOn).
  */
 export interface Task {
   /** Task name from the metadata block */
   name: string;
   /** Current task status */
   status: TaskStatus;
-  /** Priority number, e.g. "001" */
+  /** Priority (number or string), lower = higher priority */
   priority: string;
   /** Task slug derived from filename */
   slug: string;
   /** Parent item slug */
   itemSlug: string;
-  /** Dependency task slugs or relative paths */
+  /** Dependency paths relative to .backlogmd/ (SPEC v4 dep) or slugs (legacy) */
   dependsOn: string[];
   /** Description content from the DESCRIPTION section */
   description: string;
   /** Acceptance criteria checkboxes */
   acceptanceCriteria: AcceptanceCriterion[];
-  /** Source file path relative to .backlogmd/ */
+  /** Source file path relative to root (e.g. work/<slug>/001-task.md) */
   source: string;
+  /** Optional feedback file for this task (e.g. 001-setup-feedback.md), when present */
+  feedback?: TaskFeedback;
+  /** Assignee/agent id (SPEC v4); empty if unassigned */
+  assignee?: string;
+  /** Human review required before done (SPEC v4) */
+  requiresHumanReview?: boolean;
+  /** Reservation expiry ISO 8601 (SPEC v4); null if not set */
+  expiresAt?: string | null;
 }
 
 export interface AcceptanceCriterion {
   text: string;
   checked: boolean;
+}
+
+/**
+ * Optional feedback file for a task (new SPEC).
+ * Convention: task file "001-setup.md" can have "001-setup-feedback.md" in the same directory.
+ */
+export interface TaskFeedback {
+  /** Source file path relative to root (e.g. work/<slug>/001-setup-feedback.md) */
+  source: string;
+  /** Raw markdown content of the feedback file */
+  content: string;
 }
 
 export interface ValidationIssue {
@@ -106,12 +136,48 @@ export interface BacklogOutput {
   protocol: string;
   /** ISO timestamp of generation */
   generatedAt: string;
-  /** Absolute path to the .backlogmd/ directory */
+  /** Absolute path to the root directory */
   rootDir: string;
-  /** Backlog entries from backlog.md (ordered by priority) */
+  /** Work item entries (derived from work/ discovery, ordered by folder order) */
   entries: BacklogEntry[];
   /** Item folders from work/ */
   items: ItemFolder[];
+  /** All tasks parsed from task files */
+  tasks: Task[];
+  /** Validation results */
+  validation: {
+    errors: ValidationIssue[];
+    warnings: ValidationIssue[];
+  };
+}
+
+/**
+ * A work item in the document: one item from work/ with its task refs and source.
+ */
+export interface WorkItem {
+  /** The item slug (matches directory name) */
+  slug: string;
+  /** Conventional Commits type extracted from the slug, or null if absent */
+  type: ItemType | null;
+  /** Task references parsed from the item's index.md */
+  tasks: TaskRef[];
+  /** Source file path relative to root (e.g. work/<slug>/index.md) */
+  source: string;
+}
+
+/**
+ * Root document type for the backlog: work items and their tasks.
+ * Use this when you need the structure of work and tasks as a single document.
+ */
+export interface BacklogmdDocument {
+  /** Protocol version identifier (e.g. backlogmd/v2, backlogmd/v3) */
+  protocol: string;
+  /** ISO timestamp of generation */
+  generatedAt: string;
+  /** Absolute path to the root directory */
+  rootDir: string;
+  /** Work items from work/ (ordered by folder order) */
+  work: WorkItem[];
   /** All tasks parsed from task files */
   tasks: Task[];
   /** Validation results */

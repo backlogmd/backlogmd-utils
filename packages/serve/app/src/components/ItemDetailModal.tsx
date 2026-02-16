@@ -48,12 +48,16 @@ export function ItemDetailModal({
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[80vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <h3 className="text-lg font-semibold text-slate-800 truncate">
-              {item.name}
-            </h3>
-            {item.type && (
-              <span
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {item.id && (
+                <span className="shrink-0 text-slate-500 text-sm font-medium">#{item.id}</span>
+              )}
+              <h3 className="text-lg font-semibold text-slate-800 truncate">
+                {item.name}
+              </h3>
+              {item.type && (
+                <span
                 className={`shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded ${typeColorMap[item.type] ?? typeColorMap.chore}`}
                 data-testid="type-badge"
               >
@@ -61,6 +65,10 @@ export function ItemDetailModal({
               </span>
             )}
             <StatusBadge status={item.status} />
+            </div>
+            {item.assignee && (
+              <p className="text-xs text-slate-500">Assigned to {item.assignee}</p>
+            )}
           </div>
           <button
             onClick={onClose}

@@ -16,3 +16,4 @@ packages/serve/app/dist/
 # Environment
 .env
 .env.*
+!.env.example

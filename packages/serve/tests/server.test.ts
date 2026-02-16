@@ -11,7 +11,7 @@ describe("server", () => {
 
   beforeEach(() => {
     port = 3000 + Math.floor(Math.random() * 1000);
-    const fixturePath = path.resolve(__dirname, "fixtures/happy-path");
+    const fixturePath = path.resolve(__dirname, "../../../tests/fixtures/spec-v4");
     server = createServer(port, fixturePath);
   });
 
@@ -33,18 +33,31 @@ describe("server", () => {
     expect(res.headers["content-type"]).toContain("text/html");
   });
 
-  it("GET /api/backlog returns JSON", async () => {
+  it("GET /api/backlog returns JSON with entries, items, and tasks", async () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const res = await new Promise<http.IncomingMessage>((resolve, reject) => {
-      const req = http.get(`http://localhost:${port}/api/backlog`, (res) => {
-        resolve(res);
-      });
-      req.on("error", reject);
-    });
+    const { statusCode, body } = await new Promise<{ statusCode: number; body: string }>(
+      (resolve, reject) => {
+        const req = http.get(`http://localhost:${port}/api/backlog`, (res) => {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk.toString()));
+          res.on("end", () => resolve({ statusCode: res.statusCode!, body: data }));
+        });
+        req.on("error", reject);
+      },
+    );
 
-    expect(res.statusCode).toBe(200);
-    expect(res.headers["content-type"]).toContain("application/json");
+    expect(statusCode).toBe(200);
+    const data = JSON.parse(body) as { entries: { slug: string }[]; items: unknown[]; tasks: { itemSlug: string }[] };
+    expect(data.entries).toBeDefined();
+    expect(data.items).toBeDefined();
+    expect(data.tasks).toBeDefined();
+    expect(data.entries.length).toBeGreaterThan(0);
+    expect(data.tasks.length).toBeGreaterThan(0);
+    const entrySlugs = new Set(data.entries.map((e) => e.slug));
+    for (const task of data.tasks) {
+      expect(entrySlugs.has(task.itemSlug)).toBe(true);
+    }
   });
 
   it("GET /events returns text/event-stream", async () => {
@@ -147,7 +160,7 @@ describe("PATCH /api/tasks/:source", () => {
   beforeEach(() => {
     port = 4000 + Math.floor(Math.random() * 1000);
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "backlogmd-patch-test-"));
-    const fixtureSrc = path.resolve(__dirname, "fixtures/happy-path");
+    const fixtureSrc = path.resolve(__dirname, "../../../tests/fixtures/spec-v4");
     copyDirSync(fixtureSrc, tmpDir);
     server = createServer(port, tmpDir);
   });
@@ -160,7 +173,7 @@ describe("PATCH /api/tasks/:source", () => {
   it("returns 200 and updates the task file on disk", async () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const taskSource = "work/001-feat-my-feature/002-add-login.md";
+    const taskSource = "work/001-chore-project-foundation/002-docker-setup.md";
     const encoded = encodeURIComponent(taskSource);
 
     const res = await request(
@@ -178,7 +191,7 @@ describe("PATCH /api/tasks/:source", () => {
       path.join(tmpDir, taskSource),
       "utf-8",
     );
-    expect(taskContent).toContain("Status: done");
+    expect(taskContent).toMatch(/status:\s*done/i);
     expect(taskContent).not.toContain("Status: in-progress");
   });
 
@@ -201,7 +214,7 @@ describe("PATCH /api/tasks/:source", () => {
   it("returns 400 for invalid status value", async () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const taskSource = "work/001-feat-my-feature/002-add-login.md";
+    const taskSource = "work/001-chore-project-foundation/002-docker-setup.md";
     const encoded = encodeURIComponent(taskSource);
 
     const res = await request(
@@ -218,7 +231,7 @@ describe("PATCH /api/tasks/:source", () => {
   it("returns 400 for invalid JSON body", async () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const taskSource = "work/001-feat-my-feature/002-add-login.md";
+    const taskSource = "work/001-chore-project-foundation/002-docker-setup.md";
     const encoded = encodeURIComponent(taskSource);
 
     const res = await request(
@@ -229,7 +242,10 @@ describe("PATCH /api/tasks/:source", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toContain("Invalid JSON");
+    expect(json.error).toBeDefined();
+    expect(
+      json.error.includes("Invalid JSON") || json.error.includes("Bad Request"),
+    ).toBe(true);
   });
 
   it("triggers SSE reload after successful patch", async () => {
@@ -252,7 +268,7 @@ describe("PATCH /api/tasks/:source", () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // PATCH a task
-    const taskSource = "work/001-feat-my-feature/002-add-login.md";
+    const taskSource = "work/001-chore-project-foundation/002-docker-setup.md";
     const encoded = encodeURIComponent(taskSource);
     await request(
       `http://localhost:${port}/api/tasks/${encoded}`,

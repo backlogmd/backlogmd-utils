@@ -1,18 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { parseArgs } from "../src/cli.js";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { parseArgs, run } from "../src/cli.js";
 
 describe("cli parseArgs", () => {
   it("returns defaults when no arguments given", () => {
     const args = parseArgs([]);
-    expect(args.dir).toContain(".backlogmd");
+    expect(args.rootDir).toBe(process.cwd());
     expect(args.port).toBe(3030);
     expect(args.host).toBe("localhost");
     expect(args.help).toBe(false);
   });
 
-  it("parses --dir", () => {
-    const args = parseArgs(["--dir", "/tmp/backlog"]);
-    expect(args.dir).toBe("/tmp/backlog");
+  it("parses --dir as project root", () => {
+    const args = parseArgs(["--dir", "/tmp/my-project"]);
+    expect(args.rootDir).toBe("/tmp/my-project");
   });
 
   it("parses --port", () => {
@@ -37,7 +40,7 @@ describe("cli parseArgs", () => {
 
   it("parses all options together", () => {
     const args = parseArgs(["--dir", "/a", "--port", "9000", "--host", "0.0.0.0", "--help"]);
-    expect(args.dir).toBe("/a");
+    expect(args.rootDir).toBe("/a");
     expect(args.port).toBe(9000);
     expect(args.host).toBe("0.0.0.0");
     expect(args.help).toBe(true);
@@ -63,5 +66,17 @@ describe("cli parseArgs", () => {
     expect(() => parseArgs(["--port", "0"])).toThrow("--port must be a valid port number");
     expect(() => parseArgs(["--port", "abc"])).toThrow("--port must be a valid port number");
     expect(() => parseArgs(["--port", "70000"])).toThrow("--port must be a valid port number");
+  });
+});
+
+describe("cli run", () => {
+  it("creates .backlogmd/work/ and starts server when neither exists", () => {
+    const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), "backlogmd-cli-"));
+    const port = 3030 + Math.floor(Math.random() * 1000);
+    const exitCode = run(["--dir", emptyDir, "--port", String(port)]);
+    expect(exitCode).toBe(0);
+    expect(fs.existsSync(path.join(emptyDir, ".backlogmd"))).toBe(true);
+    expect(fs.existsSync(path.join(emptyDir, ".backlogmd", "work"))).toBe(true);
+    fs.rmSync(emptyDir, { recursive: true, force: true });
   });
 });

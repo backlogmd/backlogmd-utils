@@ -28,16 +28,23 @@ interface Task {
 }
 
 interface BacklogData {
-  entries: { slug: string }[];
+  entries: { id?: string; slug: string; status?: string; assignee?: string }[];
   items: ItemFolder[];
   tasks: Task[];
 }
 
-/** Derive an item's status from its task statuses. */
-function deriveStatus(taskStatuses: string[]): string {
+/** Derive an item's column from task statuses when entry has no status (SPEC v4). */
+function deriveStatusFromTasks(taskStatuses: string[]): string {
   if (taskStatuses.length === 0) return "open";
   if (taskStatuses.every((s) => s === "done")) return "done";
-  if (taskStatuses.every((s) => s === "open")) return "open";
+  if (taskStatuses.every((s) => s === "open" || s === "plan")) return "open";
+  return "in-progress";
+}
+
+/** Map item status to column id; claimed shows in In Progress. */
+function statusToColumn(status: string): string {
+  if (status === "done") return "done";
+  if (status === "open" || status === "plan") return "open";
   return "in-progress";
 }
 
@@ -55,10 +62,12 @@ function slugToType(slug: string): string | null {
 }
 
 export interface DisplayItem {
+  id?: string;
   slug: string;
   name: string;
   type: string | null;
   status: string;
+  assignee?: string;
   tasks: Task[];
 }
 
@@ -79,13 +88,16 @@ export function Board({ data, searchQuery = "" }: { data: BacklogData; searchQue
   for (const entry of data.entries) {
     const folder = data.items.find((f) => f.slug === entry.slug);
     const itemTasks = data.tasks.filter((t) => t.itemSlug === entry.slug);
-    const status = deriveStatus(itemTasks.map((t) => t.status));
+    const derived = deriveStatusFromTasks(itemTasks.map((t) => t.status));
+    const status = entry.status != null && entry.status !== "" ? entry.status : derived;
 
     displayItems.push({
+      id: entry.id,
       slug: entry.slug,
       name: slugToName(entry.slug),
       type: slugToType(entry.slug),
       status,
+      assignee: entry.assignee,
       tasks: itemTasks,
     });
   }
@@ -116,8 +128,9 @@ export function Board({ data, searchQuery = "" }: { data: BacklogData; searchQue
   };
 
   for (const item of filtered) {
-    if (byStatus[item.status]) {
-      byStatus[item.status].push(item);
+    const col = statusToColumn(item.status);
+    if (byStatus[col]) {
+      byStatus[col].push(item);
     }
   }
 

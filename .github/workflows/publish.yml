@@ -3,6 +3,7 @@ name: Publish to npm
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -19,44 +20,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Determine package from tag
-        id: pkg
-        run: |
-          TAG="${{ github.event.release.tag_name }}"
-          if [[ "$TAG" == types-v* ]]; then
-            echo "workspace=@backlogmd/types" >> "$GITHUB_OUTPUT"
-          elif [[ "$TAG" == parser-v* ]]; then
-            echo "workspace=@backlogmd/parser" >> "$GITHUB_OUTPUT"
-          elif [[ "$TAG" == writer-v* ]]; then
-            echo "workspace=@backlogmd/writer" >> "$GITHUB_OUTPUT"
-          elif [[ "$TAG" == serve-v* ]]; then
-            echo "workspace=@backlogmd/serve" >> "$GITHUB_OUTPUT"
-          else
-            echo "::error::Unknown tag prefix: $TAG (expected types-v*, parser-v*, writer-v*, or serve-v*)"
-            exit 1
-          fi
-
-      - name: Build types
-        run: npm run build -w @backlogmd/types
-
-      - name: Build parser
-        run: npm run build -w @backlogmd/parser
-
-      - name: Build writer
-        run: npm run build -w @backlogmd/writer
-
-      - name: Build serve
-        run: npm run build -w @backlogmd/serve
+      - name: Build all packages
+        run: npm run build:all
 
       - name: Run tests
         run: npm test
 
-      - name: Publish
-        run: npm publish -w ${{ steps.pkg.outputs.workspace }}
+      - name: Publish to npm
+        run: npx changeset publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
