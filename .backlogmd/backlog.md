@@ -1,6 +1,0 @@
-- [001-feat-submit-work-ui](work/001-feat-submit-work-ui/index.md)
-- [002-feat-search-ui](work/002-feat-search-ui/index.md)
-- [003-fix-item-type-badge](work/003-fix-item-type-badge/index.md)
-- [004-feat-type-support-parser-writer](work/004-feat-type-support-parser-writer/index.md)
-- [005-feat-item-detail-modal](work/005-feat-item-detail-modal/index.md)
-- [006-feat-dark-theme](work/006-feat-dark-theme/index.md)

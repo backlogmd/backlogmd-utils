@@ -1,2 +1,0 @@
-- [001-add-search-input-to-header](001-add-search-input-to-header.md)
-- [002-wire-filtering-into-board](002-wire-filtering-into-board.md)
