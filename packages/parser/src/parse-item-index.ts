@@ -1,7 +1,86 @@
 import type { List, ListItem, Link, PhrasingContent } from "mdast";
 import { parseMd } from "./md.js";
-import type { ItemFolder, TaskRef } from "./types.js";
+import type { ItemFolder, TaskRef, ItemStatus } from "./types.js";
 import { parseItemType } from "./parse-slug.js";
+
+const ITEM_STATUSES: ItemStatus[] = ["plan", "open", "claimed", "in-progress", "done"];
+
+/** Extract item id from slug (leading 3+ digits, e.g. "001-chore-x" → "001"). */
+function parseItemId(slug: string): string | undefined {
+  const m = slug.match(/^(\d{3,})/);
+  return m ? m[1] : undefined;
+}
+
+/**
+ * Extract section content. SPEC v4 uses consecutive sections without closing tags:
+ * <!-- METADATA --> ... <!-- DESCRIPTION --> ... So we take from start until the next <!-- or end.
+ */
+function extractSection(content: string, sectionName: string): string {
+  const startTag = `<!-- ${sectionName} -->`;
+  const startIndex = content.indexOf(startTag);
+  if (startIndex === -1) return "";
+
+  const from = startIndex + startTag.length;
+  const nextComment = content.indexOf("<!--", from);
+  const endIndex = nextComment === -1 ? content.length : nextComment;
+  return content.slice(from, endIndex).trim();
+}
+
+/** Strip optional surrounding single or double quotes. */
+function unquote(value: string): string {
+  const v = value.trim();
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    return v.slice(1, -1);
+  }
+  return v;
+}
+
+/** Parse YAML-like key-value block (e.g. from fenced code in METADATA). */
+function parseYamlBlock(raw: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of raw.split("\n")) {
+    const colonIndex = line.indexOf(":");
+    if (colonIndex === -1) continue;
+    const key = line.slice(0, colonIndex).trim();
+    const value = line.slice(colonIndex + 1).trim();
+    if (key) out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * Try to parse SPEC v4 item index: <!-- METADATA --> with yaml (work, status).
+ * Returns folder with status and empty tasks if format matches.
+ */
+function tryParseV4Index(content: string, slug: string, source: string): ItemFolder | null {
+  const metadataRaw = extractSection(content, "METADATA");
+  if (!metadataRaw) return null;
+
+  const codeMatch = metadataRaw.match(/```[\s\S]*?\n([\s\S]*?)```/);
+  if (!codeMatch) return null;
+
+  const meta = parseYamlBlock(codeMatch[1]);
+  const work = meta["work"];
+  const statusRaw = (meta["status"] ?? "").trim().toLowerCase();
+  if (!work) return null;
+
+  const status: ItemStatus | undefined = ITEM_STATUSES.includes(statusRaw as ItemStatus)
+    ? (statusRaw as ItemStatus)
+    : undefined;
+
+  const assigneeRaw = meta["assignee"];
+  const assignee = assigneeRaw !== undefined ? unquote(assigneeRaw) : undefined;
+
+  return {
+    id: parseItemId(slug),
+    slug,
+    type: parseItemType(slug),
+    status,
+    assignee,
+    tasks: [],
+    source,
+  };
+}
 
 /**
  * Extract the plain text from phrasing content nodes.
@@ -33,17 +112,19 @@ function findLink(item: ListItem): Link | null {
 }
 
 /**
- * Parse the content of a SPEC v2 item index.md file.
- *
- * SPEC v2 format is a simple bullet list of task file links:
- *   - [001-task-slug](001-task-slug.md)
- *   - [002-task-slug](002-task-slug.md)
+ * Parse item index.md. Supports:
+ * - SPEC v4: <!-- METADATA --> with yaml (work, status); no task list. Returns tasks: [].
+ * - Legacy v2: bullet list of task file links. Returns tasks from list.
  */
 export function parseItemIndex(
   content: string,
   slug: string,
   source: string,
 ): ItemFolder {
+  const v4 = tryParseV4Index(content, slug, source);
+  if (v4) return v4;
+
+  // Legacy v2: bullet list of task links
   const tree = parseMd(content);
   const tasks: TaskRef[] = [];
 
@@ -64,5 +145,5 @@ export function parseItemIndex(
     }
   }
 
-  return { slug, type: parseItemType(slug), tasks, source };
+  return { id: parseItemId(slug), slug, type: parseItemType(slug), tasks, source };
 }

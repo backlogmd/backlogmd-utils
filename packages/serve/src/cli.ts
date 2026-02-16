@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 
+import "dotenv/config";
 import path from "node:path";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { startServer } from "./index.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === __filename;
+
 export interface CliArgs {
-  dir: string;
+  /** Project root directory (must contain .backlogmd/) */
+  rootDir: string;
   port: number;
   host: string;
   help: boolean;
@@ -14,14 +20,14 @@ export interface CliArgs {
 const USAGE = `Usage: backlogmd-serve [options]
 
 Options:
-  --dir <path>    Path to .backlogmd/ directory (default: .backlogmd/)
+  --dir <path>    Project root: must contain .backlogmd/ (with work/ inside) or a work/ directory (default: current directory)
   --port <port>   Port to listen on (default: 3030)
   --host <host>   Host to bind to (default: localhost)
   --help          Show this help message`;
 
 export function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = {
-    dir: path.join(process.cwd(), ".backlogmd"),
+    rootDir: process.cwd(),
     port: 3030,
     host: "localhost",
     help: false,
@@ -33,7 +39,7 @@ export function parseArgs(argv: string[]): CliArgs {
         if (i + 1 >= argv.length) {
           throw new Error("--dir requires a path argument");
         }
-        args.dir = path.resolve(argv[++i]);
+        args.rootDir = path.resolve(argv[++i]);
         break;
       case "--port":
         if (i + 1 >= argv.length) {
@@ -78,13 +84,29 @@ export function run(argv: string[]): number {
     return 0;
   }
 
-  if (!fs.existsSync(args.dir)) {
-    console.error(`Error: directory not found: ${args.dir}`);
+  if (!fs.existsSync(args.rootDir)) {
+    console.error(`Error: project root not found: ${args.rootDir}`);
+    return 1;
+  }
+
+  // Resolve backlog root: directory that contains work/
+  // Prefer .backlogmd (project/.backlogmd/work/); fallback to project root (project/work/)
+  const dotBacklogmd = path.join(args.rootDir, ".backlogmd");
+  const workAtRoot = path.join(args.rootDir, "work");
+  let backlogRoot: string;
+  if (fs.existsSync(dotBacklogmd)) {
+    backlogRoot = dotBacklogmd;
+  } else if (fs.existsSync(workAtRoot)) {
+    backlogRoot = args.rootDir;
+  } else {
+    console.error(
+      `Error: no backlog found under ${args.rootDir}. Expected either .backlogmd/ (with work/ inside) or a work/ directory.`,
+    );
     return 1;
   }
 
   const server = startServer({
-    dir: args.dir,
+    dir: backlogRoot,
     port: args.port,
     host: args.host,
   });
@@ -105,7 +127,9 @@ export function run(argv: string[]): number {
   return 0;
 }
 
-const exitCode = run(process.argv.slice(2));
-if (exitCode !== 0) {
-  process.exit(exitCode);
+if (isMain) {
+  const exitCode = run(process.argv.slice(2));
+  if (exitCode !== 0) {
+    process.exit(exitCode);
+  }
 }

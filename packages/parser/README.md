@@ -1,6 +1,6 @@
 # @backlogmd/parser
 
-Parse [BacklogMD](https://github.com/backlogmd/backlogmd) markdown files into canonical JSON. Reads a `.backlogmd/` directory structure (backlog, items, tasks) and produces a single typed output with cross-links and validation.
+Parse [BacklogMD](https://github.com/backlogmd/backlogmd) markdown into canonical JSON. Reads a root directory’s **work/** tree (item index and task files) and produces typed output with cross-links and validation.
 
 ## Installation
 
@@ -14,17 +14,38 @@ Requires Node.js >= 22.
 
 ### `buildBacklogOutput(rootDir)`
 
-Reads a `.backlogmd/` directory, parses all markdown files, cross-links items and tasks, and returns a `BacklogOutput` object.
+Reads `rootDir/work/`, parses item index and task files, cross-links, and returns a `BacklogOutput` object.
 
 ```ts
 import { buildBacklogOutput, serializeOutput } from "@backlogmd/parser";
 
-const output = buildBacklogOutput(".backlogmd");
+const output = buildBacklogOutput("/path/to/root");
 
-console.log(output.items);        // RoadmapItem[]
-console.log(output.itemFolders);  // ItemFolder[]
-console.log(output.tasks);        // Task[]
-console.log(output.validation);   // { errors, warnings }
+console.log(output.entries);  // BacklogEntry[] (derived from work/)
+console.log(output.items);   // ItemFolder[]
+console.log(output.tasks);   // Task[]
+console.log(output.validation);  // { errors, warnings }
+```
+
+### `buildBacklogmdDocument(rootDir)`
+
+Returns a **BacklogmdDocument** with `work` and `tasks`.
+
+Task file formats supported:
+
+- HTML comment sections (`<!-- METADATA -->`, `<!-- DESCRIPTION -->`, etc.)
+- YAML frontmatter (`---` … `---`) with `Task`, `Status`, `Priority`, `DependsOn`, then `## Description` and `## Acceptance criteria` in the body.
+
+Optional **task feedback files**: for `001-setup.md`, a file `001-setup-feedback.md` in the same directory is attached as `task.feedback` (`{ source, content }`).
+
+```ts
+import { buildBacklogmdDocument } from "@backlogmd/parser";
+
+const doc = buildBacklogmdDocument("/path/to/root");
+
+console.log(doc.work);   // WorkItem[]
+console.log(doc.tasks);  // Task[]
+console.log(doc.validation);
 ```
 
 ### `serializeOutput(output)`
@@ -52,19 +73,21 @@ const json = writeOutput(output);
 
 ## Types
 
-The package exports the following TypeScript types:
+The package exports the following TypeScript types (from `@backlogmd/types`):
 
-- **`BacklogOutput`** — top-level output containing items, item folders, tasks, and validation results
-- **`RoadmapItem`** — an item entry from `backlog.md`
-- **`ItemFolder`** — a parsed item `index.md` with task stubs
-- **`Task`** — a fully parsed task file
-- **`TaskStub`** — a task reference from an item's task table
-- **`AcceptanceCriterion`** — a checkbox item from a task's acceptance criteria
-- **`ValidationIssue`** — an error or warning from cross-link validation
-- **`CrossLinkResult`** — the result of cross-linking items, folders, and tasks
-- **`ItemStatus`** — `"todo" | "in-progress" | "done"`
-- **`ItemFolderStatus`** — `"open" | "archived"`
-- **`TaskStatus`** — `"todo" | "in-progress" | "ready-to-review" | "ready-to-test" | "done"`
+- **`BacklogOutput`** — legacy output: entries, items, tasks, validation
+- **`BacklogmdDocument`** — document shape: work, tasks, validation (new structure)
+- **`BacklogEntry`** — a work item entry (derived from work/ discovery)
+- **`WorkItem`** — a work item with slug, type, task refs, source
+- **`ItemFolder`** — parsed item `index.md` with task refs
+- **`TaskRef`** — a task reference (slug, fileName) from an item's index
+- **`Task`** — a fully parsed task file (optional `feedback` when `*-feedback.md` exists)
+- **`TaskFeedback`** — optional feedback file for a task (`source`, `content`)
+- **`AcceptanceCriterion`** — a checkbox item from acceptance criteria
+- **`ValidationIssue`** — an error or warning
+- **`TaskStatus`** — `"open" | "block" | "in-progress" | "done"`
+- **`ItemStatus`** — derived: `"open" | "in-progress" | "done"`
+- **`ItemType`** — `"feat" | "fix" | "refactor" | "chore"`
 
 ## License
 

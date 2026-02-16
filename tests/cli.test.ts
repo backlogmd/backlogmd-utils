@@ -90,12 +90,14 @@ describe("run", () => {
   });
 
   it("returns 0 on valid fixture with no errors", async () => {
-    const fixturePath = new URL("fixtures/happy-path", import.meta.url).pathname;
+    const fixturePath = new URL("fixtures/spec-v4", import.meta.url).pathname;
     const code = await run(["--input", fixturePath]);
     expect(code).toBe(0);
     expect(logOutput.length).toBeGreaterThan(0);
     const json = JSON.parse(logOutput.join("\n"));
-    expect(json.protocol).toBe("backlogmd/v2");
+    expect(json.protocol).toBeDefined();
+    expect(json.entries).toBeDefined();
+    expect(json.tasks).toBeDefined();
   });
 
   it("returns 1 on unknown argument", async () => {

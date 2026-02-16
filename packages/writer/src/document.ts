@@ -132,7 +132,13 @@ export class BacklogDocument {
       throw new Error(`Task file "${task.source}" not found in cache`);
     }
 
-    const taskPatch = patchMetadataField(taskFileContent, "Status", newStatus);
+    // SPEC v4 uses "status:" (lowercase); SPEC v2 uses "Status:"
+    let taskPatch: { patched: string; original: string; replacement: string };
+    try {
+      taskPatch = patchMetadataField(taskFileContent, "status", newStatus);
+    } catch {
+      taskPatch = patchMetadataField(taskFileContent, "Status", newStatus);
+    }
     patches.push({
       filePath: task.source,
       original: taskPatch.original,
@@ -148,6 +154,45 @@ export class BacklogDocument {
 
     return {
       patches,
+      modelBefore: structuredClone(this._model),
+      modelAfter,
+    };
+  }
+
+  /**
+   * Change a task's assignee (SPEC v4). Returns a Changeset; call commit() to write.
+   */
+  changeTaskAssignee(taskId: string, assignee: string): Changeset {
+    const task = this._model.tasks.find(
+      (t) =>
+        t.source === taskId ||
+        `${t.itemSlug}/${t.priority}` === taskId,
+    );
+    if (!task) throw new Error(`Task "${taskId}" not found in the model`);
+    const taskFileContent = this._cache.get(task.source);
+    if (!taskFileContent) throw new Error(`Task file "${task.source}" not found in cache`);
+    let taskPatch: { patched: string; original: string; replacement: string };
+    try {
+      taskPatch = patchMetadataField(taskFileContent, "assignee", assignee);
+    } catch {
+      return {
+        patches: [],
+        modelBefore: structuredClone(this._model),
+        modelAfter: structuredClone(this._model),
+      };
+    }
+    const modelAfter: BacklogOutput = structuredClone(this._model);
+    const modelTask = modelAfter.tasks.find((t) => t.source === task.source)!;
+    modelTask.assignee = assignee;
+    return {
+      patches: [
+        {
+          filePath: task.source,
+          original: taskPatch.original,
+          replacement: taskPatch.replacement,
+          description: `task assignee → ${assignee}`,
+        },
+      ],
       modelBefore: structuredClone(this._model),
       modelAfter,
     };

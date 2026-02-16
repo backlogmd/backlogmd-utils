@@ -51,9 +51,13 @@
     "format:check": "prettier --check 'src/**/*.ts'"
   },
   "dependencies": {
+    "@backlogmd/autopilot": "*",
     "@backlogmd/parser": "*",
     "@backlogmd/types": "*",
-    "@backlogmd/writer": "*"
+    "@backlogmd/writer": "*",
+    "@langchain/openai": "^0.3.0",
+    "dotenv": "^16.4.0",
+    "langchain": "^0.3.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

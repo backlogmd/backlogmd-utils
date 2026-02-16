@@ -1,3 +1,0 @@
-- [001-mismatched-task](001-mismatched-task.md)
-- [002-another-task](002-another-task.md)
-- [003-missing-file](003-missing-file.md)

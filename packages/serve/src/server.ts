@@ -8,6 +8,10 @@ import { renderHtml } from "./html.js";
 import { buildBacklogOutput } from "@backlogmd/parser";
 import type { BacklogOutput, TaskStatus } from "@backlogmd/types";
 import { BacklogDocument } from "@backlogmd/writer";
+import { createChatAgent } from "@backlogmd/autopilot";
+import { ChatOpenAI } from "@langchain/openai";
+import { DynamicTool } from "langchain/tools";
+import type { AgentExecutor } from "langchain/agents";
 
 const VALID_STATUSES: Set<string> = new Set([
   "open",
@@ -61,8 +65,57 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+async function createChatAgentForServer(
+  backlogDir: string,
+): Promise<AgentExecutor | null> {
+  if (!process.env.OPENAI_API_KEY) {
+    return null;
+  }
+  try {
+    const getBacklog = new DynamicTool({
+      name: "get_backlog",
+      description:
+        "Get the current backlog (work items and tasks). Use this to answer questions about what is on the backlog.",
+      func: async () => {
+        const output = buildBacklogOutput(backlogDir);
+        return JSON.stringify(
+          {
+            entries: output.entries?.length ?? 0,
+            items: output.items?.length ?? 0,
+            tasks: output.tasks?.length ?? 0,
+            validationErrors: output.validation?.errors?.length ?? 0,
+            summary: output.entries?.slice(0, 20) ?? [],
+          },
+          null,
+          2,
+        );
+      },
+    });
+    return createChatAgent({
+      llm: new ChatOpenAI({ temperature: 0 }),
+      tools: [getBacklog],
+    });
+  } catch (err) {
+    console.error("[backlogmd-serve] Failed to create chat agent:", (err as Error).message);
+    return null;
+  }
+}
+
 export function createServer(port: number, backlogDir: string): ServerResult {
   const clients = new Set<ServerResponse>();
+  let chatAgentPromise: Promise<AgentExecutor | null> | null = null;
+
+  const getChatAgent = (): Promise<AgentExecutor | null> => {
+    if (!chatAgentPromise) {
+      chatAgentPromise = createChatAgentForServer(backlogDir);
+    }
+    return chatAgentPromise;
+  };
+
+  // Start creating the agent at server startup so it is ready for /api/chat
+  if (process.env.OPENAI_API_KEY) {
+    void getChatAgent();
+  }
 
   const requestHandler = async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url || "/", `http://localhost:${port}`);
@@ -172,6 +225,81 @@ export function createServer(port: number, backlogDir: string): ServerResult {
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: message }));
         }
+      }
+      return;
+    }
+
+    // POST /api/chat — chat endpoint; uses in-server agent when OPENAI_API_KEY is set
+    if (req.method === "POST" && url.pathname === "/api/chat") {
+      let body: string;
+      try {
+        body = await readBody(req);
+      } catch {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Failed to read request body" }));
+        return;
+      }
+
+      let parsed: { messages?: Array<{ role?: string; content?: string }> };
+      try {
+        parsed = JSON.parse(body);
+      } catch {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid JSON" }));
+        return;
+      }
+
+      const messages = parsed.messages;
+      if (!Array.isArray(messages) || messages.length === 0) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({ error: "Request body must include a non-empty messages array" }),
+        );
+        return;
+      }
+
+      const lastUser = [...messages].reverse().find((m) => m.role === "user");
+      const userInput =
+        typeof lastUser?.content === "string"
+          ? lastUser.content
+          : "Send a message with role 'user' and content to get a reply.";
+
+      const agent = await getChatAgent();
+      if (agent) {
+        try {
+          const result = await agent.invoke({ input: userInput });
+          const content =
+            typeof result?.output === "string"
+              ? result.output
+              : String(result?.output ?? "");
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              message: { role: "assistant" as const, content },
+            }),
+          );
+        } catch (err) {
+          console.error("[backlogmd-serve] Chat agent error:", (err as Error).message);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              error: "Chat failed",
+              message: (err as Error).message,
+            }),
+          );
+        }
+      } else {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            message: {
+              role: "assistant" as const,
+              content: process.env.OPENAI_API_KEY
+                ? "Agent is starting up; try again in a moment."
+                : `Echo (stub): ${userInput}. Set OPENAI_API_KEY to enable the live agent.`,
+            },
+          }),
+        );
       }
       return;
     }

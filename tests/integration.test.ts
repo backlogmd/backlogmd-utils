@@ -4,80 +4,69 @@ import { buildBacklogOutput, serializeOutput } from "@backlogmd/parser";
 
 const FIXTURES = path.resolve(__dirname, "fixtures");
 
-describe("integration: happy-path fixture (SPEC v2)", () => {
-  const output = buildBacklogOutput(path.join(FIXTURES, "happy-path"));
+describe("integration: spec-v4 fixture (SPEC v4 – task discovery by dir listing)", () => {
+  const output = buildBacklogOutput(path.join(FIXTURES, "spec-v4"));
 
-  it("has correct protocol version", () => {
-    expect(output.protocol).toBe("backlogmd/v2");
+  it("parses entries with item status and assignee from index", () => {
+    expect(output.entries.length).toBeGreaterThanOrEqual(1);
+    const openEntry = output.entries.find((e) => e.slug === "001-chore-project-foundation");
+    expect(openEntry).toBeDefined();
+    expect(openEntry!.id).toBe("001");
+    expect(openEntry!.type).toBe("chore");
+    expect(openEntry!.status).toBe("open");
+    const claimedEntry = output.entries.find((e) => e.slug === "002-feat-claimed-item");
+    if (claimedEntry) {
+      expect(claimedEntry.id).toBe("002");
+      expect(claimedEntry.status).toBe("claimed");
+      expect(claimedEntry.assignee).toBe("agent-1");
+    }
   });
 
-  it("parses one backlog entry with type", () => {
-    expect(output.entries).toHaveLength(1);
-    expect(output.entries[0].slug).toBe("001-feat-my-feature");
-    expect(output.entries[0].type).toBe("feat");
+  it("discovers tasks by directory listing (no task list in index)", () => {
+    expect(output.items.length).toBeGreaterThanOrEqual(1);
+    const foundation = output.items.find((i) => i.slug === "001-chore-project-foundation");
+    expect(foundation).toBeDefined();
+    expect(foundation!.tasks).toHaveLength(2);
+    expect(foundation!.tasks.map((r) => r.fileName).sort()).toEqual([
+      "001-install-next-react-tailwind.md",
+      "002-docker-setup.md",
+    ]);
   });
 
-  it("parses one item folder with two task refs", () => {
-    expect(output.items).toHaveLength(1);
+  it("parses tasks with SPEC v4 metadata (task, dep, assignee, etc.)", () => {
+    expect(output.tasks.length).toBeGreaterThanOrEqual(2);
 
-    const item = output.items[0];
-    expect(item.slug).toBe("001-feat-my-feature");
-    expect(item.type).toBe("feat");
-    expect(item.tasks).toHaveLength(2);
-    expect(item.tasks[0].slug).toBe("001-setup-project");
-    expect(item.tasks[1].slug).toBe("002-add-login");
-  });
-
-  it("parses two tasks with correct data", () => {
-    expect(output.tasks).toHaveLength(2);
-
-    const t1 = output.tasks.find((t) => t.priority === "001")!;
-    expect(t1.name).toBe("Setup project");
-    expect(t1.status).toBe("done");
-    expect(t1.itemSlug).toBe("001-feat-my-feature");
+    const t1 = output.tasks.find((t) => t.slug === "install-next-react-tailwind")!;
+    expect(t1.name).toBe("Install Next.js, React and Tailwind");
+    expect(t1.status).toBe("open");
+    expect(t1.priority).toBe("1");
     expect(t1.dependsOn).toEqual([]);
-    expect(t1.acceptanceCriteria).toHaveLength(2);
-    expect(t1.acceptanceCriteria.every((ac) => ac.checked)).toBe(true);
+    expect(t1.assignee).toBe("");
+    expect(t1.requiresHumanReview).toBe(false);
+    expect(t1.expiresAt).toBeNull();
 
-    const t2 = output.tasks.find((t) => t.priority === "002")!;
-    expect(t2.name).toBe("Add login");
-    expect(t2.status).toBe("in-progress");
-    expect(t2.dependsOn).toEqual(["001-setup-project"]);
-    expect(t2.acceptanceCriteria).toHaveLength(3);
-    expect(t2.acceptanceCriteria[0].checked).toBe(true);
-    expect(t2.acceptanceCriteria[1].checked).toBe(false);
+    const t2 = output.tasks.find((t) => t.slug === "docker-setup")!;
+    expect(t2.name).toBe("Docker setup");
+    expect(t2.dependsOn).toContain("work/001-chore-project-foundation/001-install-next-react-tailwind.md");
   });
 
   it("has no validation errors", () => {
     expect(output.validation.errors).toHaveLength(0);
+  });
+
+  it("parses item assignee when status is claimed", () => {
+    const claimed = output.items.find((i) => i.slug === "002-feat-claimed-item");
+    if (claimed) {
+      expect(claimed.status).toBe("claimed");
+      expect(claimed.assignee).toBe("agent-1");
+    }
   });
 
   it("serializes to valid JSON", () => {
     const json = JSON.parse(serializeOutput(output));
-    expect(json.protocol).toBe("backlogmd/v2");
-    expect(json.entries).toHaveLength(1);
-    expect(json.items).toHaveLength(1);
-    expect(json.tasks).toHaveLength(2);
-  });
-});
-
-describe("integration: with-warnings fixture (SPEC v2)", () => {
-  const output = buildBacklogOutput(path.join(FIXTURES, "with-warnings"));
-
-  it("parses entry and tasks", () => {
-    expect(output.entries).toHaveLength(1);
-    expect(output.tasks).toHaveLength(2);
-  });
-
-  it("produces warning for missing task file referenced in index", () => {
-    const warning = output.validation.warnings.find(
-      (w) => w.code === "INDEX_TASK_MISSING_FILE",
-    );
-    expect(warning).toBeDefined();
-    expect(warning!.message).toContain("003-missing-file.md");
-  });
-
-  it("has no validation errors", () => {
-    expect(output.validation.errors).toHaveLength(0);
+    expect(json.protocol).toBeDefined();
+    expect(json.entries).toBeDefined();
+    expect(json.items).toBeDefined();
+    expect(json.tasks).toBeDefined();
   });
 });

@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "src/workerRunner.ts",
+    "src/workerRunner.test.ts",
+    "src/cli.ts",
+    "src/agents/opencode.ts"
+  ]
+}

@@ -111,13 +111,13 @@ export function crossLink(
     }
   }
 
-  // 2. Warn about orphan item folders (in work/ but not in backlog.md)
+  // 2. Warn about orphan item folders (in work/ but not in entries)
   const entrySlugSet = new Set(entries.map((e) => e.slug));
   for (const folder of itemFolders) {
     if (!entrySlugSet.has(folder.slug)) {
       warnings.push({
         code: "ORPHAN_FOLDER",
-        message: `Item folder "${folder.slug}" exists in work/ but is not listed in backlog.md`,
+        message: `Item folder "${folder.slug}" exists in work/ but has no matching entry`,
         source: folder.source,
       });
     }

@@ -20,6 +20,7 @@ interface BacklogData {
 declare global {
   interface Window {
     __BACKLOG__?: BacklogData;
+    __CHAT_ENABLED__?: boolean;
   }
 }
 

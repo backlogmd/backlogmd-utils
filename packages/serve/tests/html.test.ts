@@ -41,20 +41,27 @@ const mockOutput = {
 };
 
 describe("html", () => {
-  it("replaces the placeholder with a script tag containing data", () => {
+  it("replaces the placeholder with a script tag containing data and chat flag", () => {
     const html = renderHtml(mockOutput);
     expect(html).not.toContain("<!--__BACKLOG_DATA__-->");
     expect(html).toContain("<script>window.__BACKLOG__=");
+    expect(html).toContain("window.__CHAT_ENABLED__=");
   });
 
   it("injects valid JSON that round-trips correctly", () => {
     const html = renderHtml(mockOutput);
-    const match = html.match(/<script>window\.__BACKLOG__=(.*?)<\/script>/);
+    const match = html.match(/<script>window\.__BACKLOG__=(.*?)window\.__CHAT_ENABLED__=/s);
     expect(match).not.toBeNull();
-    const parsed = JSON.parse(match![1]);
+    const backlogJson = match![1].replace(/;\s*$/, "");
+    const parsed = JSON.parse(backlogJson);
     expect(parsed.protocol).toBe("backlogmd/v2");
     expect(parsed.entries).toHaveLength(2);
     expect(parsed.entries[0].slug).toBe("001-feat-user-auth");
+  });
+
+  it("sets __CHAT_ENABLED__ from OPENAI_API_KEY env", () => {
+    const html = renderHtml(mockOutput);
+    expect(html).toMatch(/window\.__CHAT_ENABLED__=(true|false)/);
   });
 
   it("preserves the rest of the HTML template", () => {

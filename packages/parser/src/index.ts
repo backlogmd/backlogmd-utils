@@ -14,4 +14,9 @@ export type {
 export { deriveItemStatus } from "./derive.js";
 export { parseItemType } from "./parse-slug.js";
 export type { CrossLinkResult } from "./cross-link.js";
-export { buildBacklogOutput, serializeOutput, writeOutput } from "./emit.js";
+export {
+  buildBacklogOutput,
+  buildBacklogmdDocument,
+  serializeOutput,
+  writeOutput,
+} from "./emit.js";
