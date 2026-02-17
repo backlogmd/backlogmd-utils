@@ -1,4 +1,10 @@
 export { parseBacklog, getTask, getWorkContext } from "./worker.js";
 export { Worker } from "./workerRunner.js";
+export { WorkerReporter } from "./reporter.js";
+export { spawnWorker } from "./spawnWorker.js";
+export { runWorkerLoop } from "./runLoop.js";
+export type { WorkerReporterOptions, StatusUpdate } from "./reporter.js";
+export type { SpawnWorkerOptions } from "./spawnWorker.js";
 export type { WorkerRole, AgentTask, AgentResult, CodeAgent } from "./types.js";
+export type { WorkerLoopOptions } from "./runLoop.js";
 export { PLANNER_ROLE } from "./types.js";

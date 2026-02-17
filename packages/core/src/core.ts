@@ -41,6 +41,11 @@ export class BacklogCore {
     return this.rootDir;
   }
 
+  /** Re-read the backlog from disk (e.g. after switching branch). */
+  refresh(): void {
+    this.state = buildBacklogOutput(this.rootDir);
+  }
+
   private async refreshState(): Promise<BacklogOutput> {
     this.state = buildBacklogOutput(this.rootDir);
     return this.state;
@@ -132,7 +137,10 @@ export class BacklogCore {
 
   async addItem(input: ItemAddInput): Promise<BacklogOutput> {
     return this.queue.enqueue(async () => {
-      createWorkItem(this.rootDir, input.title, input.type);
+      createWorkItem(this.rootDir, input.title, input.type, {
+        description: input.description,
+        context: input.context,
+      });
       return this.refreshState();
     });
   }

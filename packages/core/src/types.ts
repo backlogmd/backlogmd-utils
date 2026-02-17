@@ -23,6 +23,10 @@ export interface TaskAddInput {
 export interface ItemAddInput {
   title: string;
   type?: ItemType;
+  /** Main description body for the work item (shown in DESCRIPTION section). */
+  description?: string;
+  /** Extra context bullets or notes (shown in CONTEXT section). */
+  context?: string;
 }
 
 export interface TaskContent {

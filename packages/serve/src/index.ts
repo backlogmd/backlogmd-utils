@@ -1,4 +1,4 @@
-import path from "node:path";
+import path from "path";
 import { watchBacklogDir } from "./watcher.js";
 import { createServer } from "./server.js";
 
@@ -9,6 +9,8 @@ export interface ServerOptions {
   dir?: string;
   port?: number;
   host?: string;
+  /** Called when the server is listening; receives ctx (e.g. to start in-process workers with getWorkTrigger). */
+  onListening?: (ctx: import("./context.js").AppContext) => void;
 }
 
 export interface ServerHandle {
@@ -21,10 +23,13 @@ export function startServer(options: ServerOptions = {}): ServerHandle {
   const port = options.port || 3000;
   const host = options.host || "localhost";
 
-  const { server, notifyClients, close: closeServer } = createServer(port, dir);
+  const { server, notifyClients, close: closeServer, triggerWorkAvailable } = createServer(port, dir, {
+    onListening: options.onListening,
+  });
 
   const watcher = watchBacklogDir(dir, () => {
     notifyClients();
+    triggerWorkAvailable();
   });
 
   const close = () => {

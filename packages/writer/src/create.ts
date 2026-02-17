@@ -122,6 +122,7 @@ export function createWorkItem(
   rootDir: string,
   title: string,
   type?: ItemType,
+  options?: { description?: string; context?: string },
 ): { slug: string; path: string } {
   const absRoot = path.resolve(rootDir);
   const nextId = getNextItemId(absRoot);
@@ -129,7 +130,9 @@ export function createWorkItem(
   const itemPath = `work/${slug}`;
   const absDir = path.join(absRoot, itemPath);
   fs.mkdirSync(absDir, { recursive: true });
-  const content = renderItemIndexV4(title, "open");
+  const description = options?.description?.trim() ?? "";
+  const context = options?.context?.trim() ?? "";
+  const content = renderItemIndexV4(title, "open", description, context);
   fs.writeFileSync(path.join(absDir, "index.md"), content, "utf-8");
   return { slug, path: itemPath };
 }

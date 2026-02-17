@@ -9,6 +9,11 @@ import type { Changeset, FileCache, FilePatch } from "./types.js";
 import { patchMetadataField, patchItemIndexMetadataField } from "./patch.js";
 import { applyChangeset } from "./apply.js";
 
+/** Deep clone for BacklogOutput (JSON-serializable; no DOM). */
+function deepClone<T>(x: T): T {
+  return JSON.parse(JSON.stringify(x));
+}
+
 /**
  * BacklogDocument — a virtual DOM for the .backlogmd/ directory.
  *
@@ -118,13 +123,13 @@ export class BacklogDocument {
       // Return an empty changeset — nothing to do
       return {
         patches: [],
-        modelBefore: structuredClone(this._model),
-        modelAfter: structuredClone(this._model),
+        modelBefore: deepClone(this._model),
+        modelAfter: deepClone(this._model),
       };
     }
 
     const patches: FilePatch[] = [];
-    const modelAfter: BacklogOutput = structuredClone(this._model);
+    const modelAfter: BacklogOutput = deepClone(this._model);
 
     // --- 1. Patch the task file ---
     const taskFileContent = this._cache.get(task.source);
@@ -154,7 +159,7 @@ export class BacklogDocument {
 
     return {
       patches,
-      modelBefore: structuredClone(this._model),
+      modelBefore: deepClone(this._model),
       modelAfter,
     };
   }
@@ -177,11 +182,11 @@ export class BacklogDocument {
     } catch {
       return {
         patches: [],
-        modelBefore: structuredClone(this._model),
-        modelAfter: structuredClone(this._model),
+        modelBefore: deepClone(this._model),
+        modelAfter: deepClone(this._model),
       };
     }
-    const modelAfter: BacklogOutput = structuredClone(this._model);
+    const modelAfter: BacklogOutput = deepClone(this._model);
     const modelTask = modelAfter.tasks.find((t) => t.source === task.source)!;
     modelTask.assignee = assignee;
     return {
@@ -193,7 +198,7 @@ export class BacklogDocument {
           description: `task assignee → ${assignee}`,
         },
       ],
-      modelBefore: structuredClone(this._model),
+      modelBefore: deepClone(this._model),
       modelAfter,
     };
   }
@@ -214,7 +219,7 @@ export class BacklogDocument {
       throw new Error(`Failed to patch item assignee: ${(e as Error).message}`);
     }
 
-    const modelAfter: BacklogOutput = structuredClone(this._model);
+    const modelAfter: BacklogOutput = deepClone(this._model);
     const modelItem = modelAfter.items.find((i) => i.slug === itemSlug)!;
     modelItem.assignee = assignee;
 
@@ -227,7 +232,7 @@ export class BacklogDocument {
           description: `item assignee → ${assignee}`,
         },
       ],
-      modelBefore: structuredClone(this._model),
+      modelBefore: deepClone(this._model),
       modelAfter,
     };
   }

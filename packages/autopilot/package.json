@@ -31,9 +31,9 @@
   },
   "dependencies": {
     "@backlogmd/core": "*",
-    "@backlogmd/workers": "*",
-    "@langchain/core": "^0.3.0",
-    "langchain": "^0.3.0",
+    "@langchain/classic": "^1.0.0",
+    "@langchain/core": "^1.1.0",
+    "langchain": "^1.2.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {

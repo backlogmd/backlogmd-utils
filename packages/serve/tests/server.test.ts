@@ -281,3 +281,62 @@ describe("PATCH /api/tasks/:source", () => {
     expect(sseData).toContain("data: reload");
   });
 });
+
+// ── POST /api/workers/assign ───────────────────────────────────────────
+
+describe("POST /api/workers/assign", () => {
+  let port: number;
+  let server: ReturnType<typeof createServer>;
+
+  beforeEach(() => {
+    port = 5000 + Math.floor(Math.random() * 1000);
+    const fixturePath = path.resolve(__dirname, "../../../tests/fixtures/spec-v4");
+    server = createServer(port, fixturePath);
+  });
+
+  afterEach(() => {
+    server.close();
+  });
+
+  it("returns 200 with ok JSON", async () => {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const res = await request(
+      `http://localhost:${port}/api/workers/assign`,
+      { method: "POST", headers: { "Content-Type": "application/json" } },
+      JSON.stringify({ workerId: "worker-1", taskId: "task-123" }),
+    );
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json).toEqual({ ok: true });
+  });
+
+  it("returns 200 with ok JSON for empty body", async () => {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const res = await request(
+      `http://localhost:${port}/api/workers/assign`,
+      { method: "POST", headers: { "Content-Type": "application/json" } },
+      "{}",
+    );
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json).toEqual({ ok: true });
+  });
+
+  it("returns 200 with ok JSON when assigning by itemId", async () => {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const res = await request(
+      `http://localhost:${port}/api/workers/assign`,
+      { method: "POST", headers: { "Content-Type": "application/json" } },
+      JSON.stringify({ workerId: "staff-engineer", itemId: "001-chore-project" }),
+    );
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json).toEqual({ ok: true });
+  });
+});

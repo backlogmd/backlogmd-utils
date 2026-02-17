@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
-import fs from "node:fs";
+import fs from "fs";
 import http from "node:http";
+import type { WorkerReporter } from "../reporter.js";
 import type { CodeAgent, AgentTask, AgentResult, WorkerRole } from "../types.js";
 
 const DEFAULT_JSON_INSTRUCTION = `
@@ -32,14 +33,19 @@ export class OpenCodeAgent implements CodeAgent {
   private webhookUrl?: string;
   private cwd?: string;
   private role?: WorkerRole;
+  private reporter?: WorkerReporter;
 
-  constructor(webhookUrl?: string, cwd?: string, role?: WorkerRole) {
+  constructor(webhookUrl?: string, cwd?: string, role?: WorkerRole, reporter?: WorkerReporter) {
     this.webhookUrl = webhookUrl;
     this.cwd = cwd;
     this.role = role;
+    this.reporter = reporter;
   }
 
   private sendMessage(content: string) {
+    if (this.reporter) {
+      this.reporter.reportLog(content);
+    }
     if (this.webhookUrl) {
       try {
         const url = new URL(this.webhookUrl);
@@ -58,8 +64,8 @@ export class OpenCodeAgent implements CodeAgent {
           () => {},
         );
         req.on("error", () => {});
-        req.write(postData);
-        req.end();
+        (req as unknown as { write: (chunk: string) => void; end: () => void }).write(postData);
+        (req as unknown as { write: (chunk: string) => void; end: () => void }).end();
       } catch {
         // Ignore errors
       }
@@ -103,10 +109,10 @@ export class OpenCodeAgent implements CodeAgent {
       // Send start message
       this.sendMessage("🤖 Starting execution...");
 
-      proc.stdout?.on("data", (data) => {
+      proc.stdout?.on("data", (data: Buffer | string) => {
         const str = data.toString();
         stdout += str;
-        process.stdout.write(str);
+        (process.stdout as unknown as { write: (s: string) => void }).write(str);
 
         // Extract status updates
         const statusMatches = str.match(/\[STATUS: [^\]]+\]/g);
@@ -118,10 +124,10 @@ export class OpenCodeAgent implements CodeAgent {
         }
       });
 
-      proc.stderr?.on("data", (data) => {
+      proc.stderr?.on("data", (data: Buffer | string) => {
         const str = data.toString();
         stderr += str;
-        process.stderr.write(str);
+        (process.stderr as unknown as { write: (s: string) => void }).write(str);
       });
 
       proc.on("close", (code) => {

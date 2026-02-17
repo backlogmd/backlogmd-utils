@@ -1,16 +1,19 @@
-import type { BacklogOutput, Task } from "@backlogmd/types";
+import type { BacklogOutput, Task, TaskStatus } from "@backlogmd/types";
 import { BacklogCore } from "@backlogmd/core";
 import type { CodeAgent, AgentTask, WorkerRole } from "./types.js";
+import type { WorkerReporter } from "./reporter.js";
 import { OpenCodeAgent } from "./agents/opencode.js";
 import type { VCSProvider, VCSOptions } from "@backlogmd/vcs";
-import fs from "node:fs/promises";
-import path from "node:path";
+/// <reference types="node" />
+import fs from "fs/promises";
+import path from "path";
 
 export class Worker {
   private core: BacklogCore;
   private agent: CodeAgent;
   private vcs?: VCSProvider;
   private vcsOptions?: VCSOptions;
+  private reporter?: WorkerReporter;
   private role?: WorkerRole;
 
   constructor(
@@ -18,13 +21,15 @@ export class Worker {
     agent?: CodeAgent,
     vcs?: VCSProvider,
     vcsOptions?: VCSOptions,
+    reporter?: WorkerReporter,
     role?: WorkerRole,
   ) {
     this.core = core;
     const rootDir = core.getRootDir();
     const cwd = path.dirname(rootDir);
     this.role = role;
-    this.agent = agent ?? new OpenCodeAgent(undefined, cwd, role);
+    this.reporter = reporter;
+    this.agent = agent ?? new OpenCodeAgent(undefined, cwd, role, reporter);
     this.vcs = vcs;
     this.vcsOptions = vcsOptions;
   }
@@ -50,7 +55,8 @@ export class Worker {
     const state = this.core.getState();
     const task = state.tasks.find(
       (t) =>
-        (t.slug.split("-")[0] === taskId || t.slug === taskId) && t.status === "plan",
+        (t.slug.split("-")[0] === taskId || t.slug === taskId) &&
+        (t.status as string) === "plan",
     );
     if (task) {
       const content = await this.core.getTaskContent(task.source);
@@ -147,6 +153,15 @@ export class Worker {
 
     console.log(`[worker] Running planner on work item: ${item.slug}`);
     await this.executeTask(agentTask);
+    this.core.refresh();
+    const stateAfter = this.core.getState();
+    const planTasks = stateAfter.tasks.filter(
+      (t) => (t.itemSlug === item.slug || t.itemSlug === itemSlug) && t.status === "plan",
+    );
+    for (const t of planTasks) {
+      await this.core.updateTaskStatus(t.source, "open");
+      console.log(`[worker] Moved task to open: ${t.name}`);
+    }
   }
 
   private parseItemIndexContent(content: string): { title: string; description: string } {
@@ -224,7 +239,7 @@ export class Worker {
 
   private getPlanTasks(state: BacklogOutput): AgentTask[] {
     return state.tasks
-      .filter((t) => t.status === "plan")
+      .filter((t) => (t.status as string) === "plan")
       .map((t) => {
         const basename = path.basename(t.source, ".md");
         const id = basename.match(/^(\d+)-/)?.[1] ?? t.slug;
@@ -242,6 +257,12 @@ export class Worker {
   private async executeTask(task: AgentTask): Promise<void> {
     const isDirect = task.id === "direct";
     const isExecuteOnly = task.executeOnly === true;
+
+    this.reporter?.reportStatus({
+      status: "running",
+      taskId: task.id,
+      taskTitle: task.title,
+    });
 
     if (!isDirect && !isExecuteOnly) {
       console.log(`[worker] Executing task: ${task.title}`);
@@ -263,9 +284,8 @@ export class Worker {
             for (const t of tasksCreated) {
               const title = t?.title?.trim();
               if (!title) continue;
-              const status = t.status === "plan" ? "plan" : "open";
-              await this.core.addTask(task.itemSlug, { title, status });
-              console.log(`[worker] Created task: ${title} (${status})`);
+              await this.core.addTask(task.itemSlug, { title, status: "plan" });
+              console.log(`[worker] Created task: ${title} (plan)`);
             }
           }
         }
@@ -297,6 +317,8 @@ export class Worker {
       if (!isDirect && !isExecuteOnly) {
         await this.core.updateTaskStatus(task.source, "open");
       }
+    } finally {
+      this.reporter?.reportStatus({ status: "idle" });
     }
   }
 

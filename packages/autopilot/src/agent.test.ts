@@ -15,7 +15,7 @@ describe("ServeChatModel", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string, init?: RequestInit) => {
+      vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
         if (url === `${baseUrl}/api/chat` && init?.method === "POST") {
           const body = JSON.parse((init.body as string) ?? "{}");
           const messages = body.messages ?? [];
@@ -23,12 +23,19 @@ describe("ServeChatModel", () => {
           const content = lastUser?.content
             ? `Echo: ${lastUser.content}`
             : "No user message";
-          return new Response(
-            JSON.stringify({ message: { role: "assistant", content } }),
-            { headers: { "Content-Type": "application/json" } },
-          );
+          return {
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            json: () => Promise.resolve({ message: { role: "assistant", content } }),
+          };
         }
-        return new Response("Not Found", { status: 404 });
+        return {
+          ok: false,
+          status: 404,
+          statusText: "Not Found",
+          json: () => Promise.resolve({}),
+        };
       }),
     );
   });
@@ -50,20 +57,28 @@ describe("createChatAgent", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string, init?: RequestInit) => {
+      vi.fn(async (url: string, init?: { method?: string }) => {
         if (url === `${baseUrl}/api/chat` && init?.method === "POST") {
-          return new Response(
-            JSON.stringify({
-              message: {
-                role: "assistant",
-                content:
-                  "Thought: I have the answer\nFinal Answer: You can GET /api/backlog for the backlog.",
-              },
-            }),
-            { headers: { "Content-Type": "application/json" } },
-          );
+          return {
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            json: () =>
+              Promise.resolve({
+                message: {
+                  role: "assistant",
+                  content:
+                    "Thought: I have the answer\nFinal Answer: You can GET /api/backlog for the backlog.",
+                },
+              }),
+          };
         }
-        return new Response("Not Found", { status: 404 });
+        return {
+          ok: false,
+          status: 404,
+          statusText: "Not Found",
+          json: () => Promise.resolve({}),
+        };
       }),
     );
   });

@@ -4,6 +4,12 @@ export interface VCSCommitResult {
   error?: string;
 }
 
+export interface CreatePullRequestResult {
+  success: boolean;
+  url?: string;
+  error?: string;
+}
+
 export interface VCSStatusResult {
   isClean: boolean;
   modified: string[];
@@ -70,4 +76,4 @@ export interface VCSOptions {
   autoPush?: boolean;
 }
 
-export { GitProvider } from "./git.js";
+export { GitProvider, type WorktreeInfo } from "./git.js";

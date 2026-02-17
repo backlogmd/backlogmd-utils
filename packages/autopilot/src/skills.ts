@@ -1,11 +1,8 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync } from "fs";
+import path from "path";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-/** Package root: one level up from src/ or dist/ */
-const packageRoot = path.join(__dirname, "..");
+/** Package root: one level up from src/ or dist/ (Node 20.11+ import.meta.dirname) */
+const packageRoot = path.join(import.meta.dirname, "..");
 
 /**
  * Load a skill markdown file from packages/autopilot/skills/.

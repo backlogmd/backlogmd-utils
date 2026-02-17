@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { TaskRow } from "./TaskRow";
 import { StatusBadge } from "./StatusBadge";
 import type { DisplayItem } from "./Board";
+import type { WorkerState } from "./WorkersPopover";
 
 const typeColorMap: Record<string, string> = {
   feat: "bg-blue-100 text-blue-700",
@@ -21,6 +22,12 @@ export function ItemDetailModal({
   onTaskStatusChange: (taskSource: string, newStatus: string) => void;
   pendingTasks: Set<string>;
 }) {
+  const [workers, setWorkers] = useState<WorkerState[]>([]);
+  const [workersLoading, setWorkersLoading] = useState(false);
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string>("");
+  const [assigning, setAssigning] = useState(false);
+  const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
+
   // Close on Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -29,6 +36,44 @@ export function ItemDetailModal({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
+
+  // Fetch workers when modal opens
+  useEffect(() => {
+    setWorkersLoading(true);
+    setSelectedWorkerId("");
+    fetch("/api/workers")
+      .then((res) => (res.ok ? res.json() : { workers: [] }))
+      .then((json: { workers: WorkerState[] }) => setWorkers(json.workers ?? []))
+      .catch(() => setWorkers([]))
+      .finally(() => setWorkersLoading(false));
+  }, [item.slug]);
+
+  const handleAssign = () => {
+    if (!selectedWorkerId.trim()) return;
+    setAssigning(true);
+    setAssignSuccess(null);
+    fetch("/api/workers/assign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workerId: selectedWorkerId,
+        itemId: item.slug,
+      }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error ?? `Assign failed (${res.status})`);
+        }
+        const workerLabel = workers.find((w) => `${w.name}:${w.role}` === selectedWorkerId)?.name ?? selectedWorkerId;
+        setAssignSuccess(workerLabel);
+        setTimeout(() => onClose(), 1200);
+      })
+      .catch((err: Error) => {
+        setAssignSuccess(`Error: ${err.message}`);
+      })
+      .finally(() => setAssigning(false));
+  };
 
   // Sort tasks by priority
   const sortedTasks = [...item.tasks].sort((a, b) =>
@@ -78,6 +123,46 @@ export function ItemDetailModal({
           >
             ✕
           </button>
+        </div>
+
+        {/* Assign to worker */}
+        <div className="px-6 py-3 border-b border-slate-100 bg-slate-50/80 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-600">Assign to</span>
+          <select
+            value={selectedWorkerId}
+            onChange={(e) => setSelectedWorkerId(e.target.value)}
+            disabled={workersLoading}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent disabled:opacity-50"
+            aria-label="Select worker"
+            data-testid="assign-worker-select"
+          >
+            <option value="">Select a worker…</option>
+            {workers.map((w) => {
+              const id = `${w.name}:${w.role}`;
+              return (
+                <option key={id} value={id}>
+                  {w.name} ({w.role})
+                </option>
+              );
+            })}
+          </select>
+          <button
+            type="button"
+            onClick={handleAssign}
+            disabled={!selectedWorkerId.trim() || assigning || workersLoading}
+            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none rounded-lg transition-colors"
+            data-testid="assign-button"
+          >
+            {assigning ? "Assigning…" : "Assign"}
+          </button>
+          {assignSuccess && (
+            <span className={`text-xs font-medium ${assignSuccess.startsWith("Error") ? "text-red-600" : "text-emerald-600"}`}>
+              {assignSuccess.startsWith("Error") ? assignSuccess : `Assigned to ${assignSuccess}`}
+            </span>
+          )}
+          {workers.length === 0 && !workersLoading && !assignSuccess && (
+            <span className="text-xs text-slate-400">No workers connected</span>
+          )}
         </div>
 
         {/* Body */}

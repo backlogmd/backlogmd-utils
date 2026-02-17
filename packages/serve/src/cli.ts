@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 import "dotenv/config";
-import path from "node:path";
+import path from "path";
 import fs from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath } from "url";
+import { runWorkerLoop, PLANNER_ROLE } from "@backlogmd/workers";
+import type { AppContext } from "./context.js";
 import { startServer } from "./index.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -69,6 +71,28 @@ export function parseArgs(argv: string[]): CliArgs {
   return args;
 }
 
+const STAFF_ROLE = { id: "executor", name: "Executor" } as const;
+
+/** Start planner and staff in-process; they wait on the server queue (no poll loop). */
+function startAgentsInProcess(backlogRoot: string, host: string, port: number, ctx: AppContext): void {
+  const url = `http://${host}:${port}`;
+  void runWorkerLoop({
+    backlogDir: backlogRoot,
+    serverUrl: url,
+    name: "Planner",
+    role: PLANNER_ROLE,
+    getWorkTrigger: ctx.getWorkTrigger,
+  });
+  void runWorkerLoop({
+    backlogDir: backlogRoot,
+    serverUrl: url,
+    name: "Staff",
+    role: STAFF_ROLE,
+    getWorkTrigger: ctx.getWorkTrigger,
+  });
+  console.error("[serve] Started 2 agents in-process (event-driven, no poll loop)");
+}
+
 export function run(argv: string[]): number {
   let args: CliArgs;
   try {
@@ -109,6 +133,9 @@ export function run(argv: string[]): number {
     dir: backlogRoot,
     port: args.port,
     host: args.host,
+    onListening: (ctx) => {
+      startAgentsInProcess(backlogRoot, args.host, args.port, ctx);
+    },
   });
 
   const url = `http://${args.host}:${args.port}`;

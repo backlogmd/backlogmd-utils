@@ -14,18 +14,18 @@ describe("Worker", () => {
     it("parses the current backlog and returns a BacklogmdDocument", () => {
       const doc = parseBacklog(SPEC_V4);
 
-      expect(doc).toHaveProperty("work");
+      expect(doc).toHaveProperty("items");
       expect(doc).toHaveProperty("tasks");
       expect(doc).toHaveProperty("rootDir");
-      expect(Array.isArray(doc.work)).toBe(true);
+      expect(Array.isArray(doc.items)).toBe(true);
       expect(Array.isArray(doc.tasks)).toBe(true);
     });
 
     it("parses work items and tasks from spec-v4 fixture", () => {
       const doc = parseBacklog(SPEC_V4);
 
-      expect(doc.work.length).toBeGreaterThanOrEqual(1);
-      expect(doc.work[0].slug).toBe("001-chore-project-foundation");
+      expect(doc.items.length).toBeGreaterThanOrEqual(1);
+      expect(doc.items[0].slug).toBe("001-chore-project-foundation");
       expect(doc.tasks.length).toBeGreaterThanOrEqual(2);
       const installTask = doc.tasks.find((t) => t.slug === "install-next-react-tailwind");
       expect(installTask).toBeDefined();
