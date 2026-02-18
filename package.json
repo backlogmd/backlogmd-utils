@@ -15,7 +15,7 @@
     "lint": "eslint src/ tests/",
     "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts'",
-    "build:all": "npm run build -w @backlogmd/types && npm run build -w @backlogmd/parser && npm run build -w @backlogmd/writer && npm run build -w @backlogmd/vcs && npm run build -w @backlogmd/autopilot && npm run build -w @backlogmd/workers && npm run build -w @backlogmd/serve",
+    "build:all": "npm run build -w @backlogmd/types && npm run build -w @backlogmd/parser && npm run build -w @backlogmd/writer && npm run build -w @backlogmd/vcs && npm run build -w @backlogmd/workers && npm run build -w @backlogmd/serve",
     "serve": "npm run build:all && node packages/serve/dist/cli.js",
     "changeset": "changeset",
     "version": "changeset version",
@@ -28,8 +28,7 @@
     "packages/serve",
     "packages/core",
     "packages/vcs",
-    "packages/workers",
-    "packages/autopilot"
+    "packages/workers"
   ],
   "devDependencies": {
     "@changesets/cli": "^2.27.0",

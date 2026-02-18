@@ -51,6 +51,12 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     "/api/workers/assign",
     (req, reply) => postAssignWork(ctx, req as never, reply),
   );
+
+  app.get<{ Querystring: { name?: string; role?: string } }>(
+    "/api/work",
+    (req, reply) => getWorkerAssignments(ctx, req as never, reply),
+  );
+
   app.get<{ Querystring: { name?: string; role?: string } }>(
     "/api/workers/assignments",
     (req, reply) => getWorkerAssignments(ctx, req as never, reply),

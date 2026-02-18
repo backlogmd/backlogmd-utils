@@ -1,6 +1,7 @@
 import path from "node:path";
-import type { BacklogOutput, TaskStatus } from "@backlogmd/types";
+import type { BacklogOutput, BacklogmdDocument, TaskStatus, WorkItemDto } from "@backlogmd/types";
 import { buildBacklogOutput } from "@backlogmd/parser";
+import { fromBacklogToDtos } from "./mappers/WorkItemsMapper.js";
 import {
     BacklogDocument,
     createWorkItem,
@@ -9,13 +10,9 @@ import {
     removeTaskFile,
 } from "@backlogmd/writer";
 import { OperationQueue } from "./queue.js";
-import type { CoreOptions, TaskAddInput, ItemAddInput, TaskContent } from "./types.js";
+import type { BacklogmdOptions, TaskAddInput, ItemAddInput, TaskContent } from "./types.js";
 
-/**
- * Core API for BacklogMD (SPEC v4).
- * Uses parser to read state and writer to mutate files
- */
-export class BacklogCore {
+export class Backlogmd {
     private rootDir: string;
     private state: BacklogOutput;
     private queue: OperationQueue;
@@ -26,10 +23,10 @@ export class BacklogCore {
         this.queue = new OperationQueue();
     }
 
-    static async load(options: CoreOptions): Promise<BacklogCore> {
+    static async load(options: BacklogmdOptions): Promise<Backlogmd> {
         const absRoot = path.resolve(options.rootDir);
         const state = buildBacklogOutput(absRoot);
-        return new BacklogCore(absRoot, state);
+        return new Backlogmd(absRoot, state);
     }
 
     /** Current backlog state (from parser). Re-parsed after each mutation. */
@@ -39,6 +36,18 @@ export class BacklogCore {
 
     getRootDir(): string {
         return this.rootDir;
+    }
+
+    getPendingWork(): WorkItemDto[] {
+        const doc: BacklogmdDocument = {
+            protocol: this.state.protocol,
+            generatedAt: this.state.generatedAt,
+            rootDir: this.state.rootDir,
+            work: this.state.items,
+            tasks: this.state.tasks,
+            validation: this.state.validation,
+        };
+        return fromBacklogToDtos(doc).filter((item) => item.status === "open");
     }
 
     /** Re-read the backlog from disk (e.g. after switching branch). */

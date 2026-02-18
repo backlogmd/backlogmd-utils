@@ -1,6 +1,6 @@
 import type { Server, ServerResponse } from "http";
 import Fastify from "fastify";
-import { createChatAgentForServer } from "./chatAgent.js";
+//import { createChatAgentForServer } from "./chatAgent.js";
 import type { AppContext, WorkerReportBody } from "./context.js";
 import { WorkerRegistry } from "./workerRegistry.js";
 import { AssignmentQueue } from "./assignmentQueue.js";
@@ -52,20 +52,20 @@ export function createServer(
     }
   };
 
-  let chatAgentPromise: Promise<Awaited<ReturnType<typeof createChatAgentForServer>>> | null = null;
-  const getChatAgent = (): Promise<Awaited<ReturnType<typeof createChatAgentForServer>>> => {
-    if (!chatAgentPromise) {
-      chatAgentPromise = createChatAgentForServer(backlogDir, {
-        onBacklogChange: () => notifyClients(),
-        getWorkerStates: () => workerRegistry.getAll(),
-      });
-    }
-    return chatAgentPromise;
-  };
+  // let chatAgentPromise: Promise<Awaited<ReturnType<typeof createChatAgentForServer>>> | null = null;
+  // const getChatAgent = (): Promise<Awaited<ReturnType<typeof createChatAgentForServer>>> => {
+  //   if (!chatAgentPromise) {
+  //     chatAgentPromise = createChatAgentForServer(backlogDir, {
+  //       onBacklogChange: () => notifyClients(),
+  //       getWorkerStates: () => workerRegistry.getAll(),
+  //     });
+  //   }
+  //   return chatAgentPromise;
+  // };
 
-  if (process.env.OPENAI_API_KEY) {
-    void getChatAgent();
-  }
+  // if (process.env.OPENAI_API_KEY) {
+  //   void getChatAgent();
+  // }
 
   const notifyClients = (): void => {
     const message = "data: reload\n\n";
@@ -84,10 +84,8 @@ export function createServer(
   const assignmentQueue = new AssignmentQueue();
   const enqueueAssignment = (msg: import("./assignmentQueue.js").AssignmentMessage) =>
     assignmentQueue.enqueue(msg);
-  const dequeueAssignment = (workerId: string) =>
-    assignmentQueue.dequeueForWorker(workerId);
-  const listAssignments = (workerId: string) =>
-    assignmentQueue.listForWorker(workerId);
+  const dequeueAssignment = (workerId: string) => assignmentQueue.dequeueForWorker(workerId);
+  const listAssignments = (workerId: string) => assignmentQueue.listForWorker(workerId);
 
   const CLAIM_STALE_MS = 5 * 60 * 1000; // 5 minutes
   const claimedByWorker = new Map<string, { itemId: string; since: number }>();
@@ -100,7 +98,9 @@ export function createServer(
     for (const entry of claimedByWorker.values()) {
       if (entry.itemId === itemId) {
         if (now - entry.since > CLAIM_STALE_MS) {
-          const toDelete = [...claimedByWorker.entries()].filter(([, v]) => v.itemId === itemId).map(([k]) => k);
+          const toDelete = [...claimedByWorker.entries()]
+            .filter(([, v]) => v.itemId === itemId)
+            .map(([k]) => k);
           for (const k of toDelete) claimedByWorker.delete(k);
           return false;
         }
@@ -122,7 +122,7 @@ export function createServer(
 
   const ctx: AppContext = {
     backlogDir,
-    getChatAgent,
+    getChatAgent: () => Promise.resolve(null),
     notifyClients,
     broadcastWorkerUpdate,
     broadcastStatus,

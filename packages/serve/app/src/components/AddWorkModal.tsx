@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { WORK_ITEM_TEMPLATE } from "../constants";
 
 export function AddWorkModal({
   onClose,
@@ -7,7 +8,7 @@ export function AddWorkModal({
   onClose: () => void;
   onSubmit: (content: string) => void;
 }) {
-  const [content, setContent] = useState("");
+  const [content, setContent] = useState(WORK_ITEM_TEMPLATE);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Focus textarea on mount
@@ -54,13 +55,12 @@ export function AddWorkModal({
         {/* Body */}
         <div className="px-6 py-4 flex-1 overflow-auto">
           <label className="block text-sm font-medium text-slate-600 mb-2">
-            Paste backlogmd template
+            Work item template
           </label>
           <textarea
             ref={textareaRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder={"<!-- METADATA -->\n\n```\nTask: My Task\nStatus: open\nPriority: 001\n```\n\n<!-- /METADATA -->"}
             className="w-full h-64 rounded-lg border border-slate-300 bg-slate-50 p-4 font-mono text-sm text-slate-800 placeholder:text-slate-400 resize-y focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
           />
         </div>

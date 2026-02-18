@@ -6,36 +6,38 @@ export { createServer } from "./server.js";
 export type { ServerResult } from "./server.js";
 
 export interface ServerOptions {
-  dir?: string;
-  port?: number;
-  host?: string;
-  /** Called when the server is listening; receives ctx (e.g. to start in-process workers with getWorkTrigger). */
-  onListening?: (ctx: import("./context.js").AppContext) => void;
+    dir?: string;
+    port?: number;
+    host?: string;
+    /** Called when the server is listening; receives ctx (e.g. to start in-process workers with getWorkTrigger). */
+    onListening?: (ctx: import("./context.js").AppContext) => void;
 }
 
 export interface ServerHandle {
-  close: () => void;
+    close: () => void;
 }
 
 export function startServer(options: ServerOptions = {}): ServerHandle {
-  const cwd = process.cwd();
-  const dir = path.resolve(options.dir || path.join(cwd, ".backlogmd"));
-  const port = options.port || 3000;
-  const host = options.host || "localhost";
+    const cwd = process.cwd();
+    const dir = path.resolve(options.dir || path.join(cwd, ".backlogmd"));
+    const port = options.port || 3000;
+    const {
+        notifyClients,
+        close: closeServer,
+        triggerWorkAvailable,
+    } = createServer(port, dir, {
+        onListening: options.onListening,
+    });
 
-  const { server, notifyClients, close: closeServer, triggerWorkAvailable } = createServer(port, dir, {
-    onListening: options.onListening,
-  });
+    const watcher = watchBacklogDir(dir, () => {
+        notifyClients();
+        triggerWorkAvailable();
+    });
 
-  const watcher = watchBacklogDir(dir, () => {
-    notifyClients();
-    triggerWorkAvailable();
-  });
+    const close = () => {
+        watcher.close();
+        closeServer();
+    };
 
-  const close = () => {
-    watcher.close();
-    closeServer();
-  };
-
-  return { close };
+    return { close };
 }
