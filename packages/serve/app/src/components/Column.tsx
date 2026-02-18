@@ -27,7 +27,7 @@ export function Column({
         {onAdd && (
           <button
             onClick={onAdd}
-            className="ml-1 w-6 h-6 flex items-center justify-center rounded-full text-slate-400 hover:text-blue-600 hover:bg-white/80 transition-colors text-lg leading-none"
+            className="ml-1 w-6 h-6 flex items-center justify-center rounded-full text-slate-400 hover:text-blue-600 hover:bg-white/80 transition-colors text-lg leading-none focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
             aria-label="Add work"
           >
             +

@@ -55,7 +55,15 @@ const columns = [
   { id: "done", title: "Done", color: "bg-col-done", icon: "●" },
 ] as const;
 
-export function Board({ data, searchQuery = "" }: { data: BacklogStateDto; searchQuery?: string }) {
+export function Board({
+  data,
+  searchQuery = "",
+  onSearchQueryChange,
+}: {
+  data: BacklogStateDto;
+  searchQuery?: string;
+  onSearchQueryChange?: (value: string) => void;
+}) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<DisplayItem | null>(null);
   const { updateTaskStatus, pendingTasks } = useTaskStatusUpdate();
@@ -105,11 +113,27 @@ export function Board({ data, searchQuery = "" }: { data: BacklogStateDto; searc
 
   const handleAddWork = (content: string) => {
     console.log("[backlogmd] Submitted work:\n", content);
-    setShowAddModal(false);
+    // Modal shows "Not implemented yet" and stays open until user closes
   };
+
+  const noSearchResults = query.length > 0 && filtered.length === 0;
 
   return (
     <>
+      {noSearchResults && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg bg-slate-100 border border-slate-200 px-4 py-3">
+          <p className="text-sm text-slate-600">No items match your search.</p>
+          {onSearchQueryChange && (
+            <button
+              type="button"
+              onClick={() => onSearchQueryChange("")}
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 rounded px-2 py-1"
+            >
+              Clear search
+            </button>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {columns.map((col) => (
           <Column

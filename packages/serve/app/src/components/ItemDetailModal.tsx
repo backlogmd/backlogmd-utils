@@ -1,17 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { TaskRow } from "./TaskRow";
 import { StatusBadge } from "./StatusBadge";
 import { EditItemContentModal } from "./EditItemContentModal";
 import { EditTaskContentModal } from "./EditTaskContentModal";
+import { TYPE_COLOR_MAP } from "../constants";
 import type { DisplayItem } from "./Board";
 import type { WorkerState } from "./WorkersPopover";
 
-const typeColorMap: Record<string, string> = {
-    feat: "bg-blue-100 text-blue-700",
-    fix: "bg-red-100 text-red-700",
-    refactor: "bg-amber-100 text-amber-700",
-    chore: "bg-slate-100 text-slate-600",
-};
+function getFocusables(container: HTMLElement): HTMLElement[] {
+    const sel = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    return Array.from(container.querySelectorAll<HTMLElement>(sel)).filter(
+        (el) => !el.hasAttribute("disabled") && el.offsetParent !== null,
+    );
+}
 
 export function ItemDetailModal({
     item,
@@ -31,15 +32,45 @@ export function ItemDetailModal({
     const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
   const [showEditContent, setShowEditContent] = useState(false);
   const [editTaskSource, setEditTaskSource] = useState<string | null>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
-  // Close on Escape
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") onClose();
-        };
-        document.addEventListener("keydown", handleKeyDown);
-        return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [onClose]);
+  // Focus trap and restore: save focus on open, trap Tab, restore on close
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    const firstFocusable = modalRef.current && getFocusables(modalRef.current)[0];
+    if (firstFocusable) {
+      firstFocusable.focus();
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (previousFocusRef.current?.focus) previousFocusRef.current.focus();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !modalRef.current) return;
+      const focusables = getFocusables(modalRef.current);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previousFocusRef.current?.focus) previousFocusRef.current.focus();
+    };
+  }, [onClose]);
 
     // Fetch workers when modal opens
     useEffect(() => {
@@ -92,11 +123,14 @@ export function ItemDetailModal({
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
             onClick={(e) => {
-                if (e.target === e.currentTarget) onClose();
+                if (e.target === e.currentTarget) {
+                  if (previousFocusRef.current?.focus) previousFocusRef.current.focus();
+                  onClose();
+                }
             }}
             data-testid="modal-backdrop"
         >
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[80vh]">
+            <div ref={modalRef} className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[80vh]">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
                     <div className="flex flex-col gap-1.5 min-w-0">
@@ -111,7 +145,7 @@ export function ItemDetailModal({
                             </h3>
                             {item.type && (
                                 <span
-                                    className={`shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded ${typeColorMap[item.type] ?? typeColorMap.chore}`}
+                                    className={`shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded ${TYPE_COLOR_MAP[item.type] ?? TYPE_COLOR_MAP.chore}`}
                                     data-testid="type-badge"
                                 >
                                     {item.type}
@@ -124,8 +158,11 @@ export function ItemDetailModal({
                         )}
                     </div>
                     <button
-                        onClick={onClose}
-                        className="text-slate-400 hover:text-slate-600 transition-colors text-xl leading-none p-1 shrink-0 ml-3"
+                        onClick={() => {
+                          if (previousFocusRef.current?.focus) previousFocusRef.current.focus();
+                          onClose();
+                        }}
+                        className="text-slate-400 hover:text-slate-600 transition-colors text-xl leading-none p-1 shrink-0 ml-3 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 rounded"
                         aria-label="Close"
                         data-testid="close-button"
                     >
@@ -213,8 +250,11 @@ export function ItemDetailModal({
                     </button>
                     <button
                         type="button"
-                        onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                        onClick={() => {
+                          if (previousFocusRef.current?.focus) previousFocusRef.current.focus();
+                          onClose();
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
                     >
                         Close
                     </button>
