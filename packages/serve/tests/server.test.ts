@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Backlogmd } from "@backlogmd/core";
 import { createServer } from "../src/server.js";
 import path from "node:path";
 import fs from "node:fs";
@@ -9,10 +10,11 @@ describe("server", () => {
   let port: number;
   let server: ReturnType<typeof createServer>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     port = 3000 + Math.floor(Math.random() * 1000);
     const fixturePath = path.resolve(__dirname, "../../../tests/fixtures/spec-v4");
-    server = createServer(port, fixturePath);
+    const backlogmd = await Backlogmd.load({ rootDir: fixturePath });
+    server = createServer(port, fixturePath, { backlogmd });
   });
 
   afterEach(() => {
@@ -33,7 +35,7 @@ describe("server", () => {
     expect(res.headers["content-type"]).toContain("text/html");
   });
 
-  it("GET /api/backlog returns JSON with entries, items, and tasks", async () => {
+  it("GET /api/backlog returns JSON (BacklogStateDto) with work and validation", async () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     const { statusCode, body } = await new Promise<{ statusCode: number; body: string }>(
@@ -48,15 +50,15 @@ describe("server", () => {
     );
 
     expect(statusCode).toBe(200);
-    const data = JSON.parse(body) as { entries: { slug: string }[]; items: unknown[]; tasks: { itemSlug: string }[] };
-    expect(data.entries).toBeDefined();
-    expect(data.items).toBeDefined();
-    expect(data.tasks).toBeDefined();
-    expect(data.entries.length).toBeGreaterThan(0);
-    expect(data.tasks.length).toBeGreaterThan(0);
-    const entrySlugs = new Set(data.entries.map((e) => e.slug));
-    for (const task of data.tasks) {
-      expect(entrySlugs.has(task.itemSlug)).toBe(true);
+    const data = JSON.parse(body) as { protocol: string; work: { slug: string; tasks: { itemSlug: string }[] }[]; validation: { errors: unknown[]; warnings: unknown[] } };
+    expect(data.protocol).toBeDefined();
+    expect(data.work).toBeDefined();
+    expect(Array.isArray(data.work)).toBe(true);
+    expect(data.validation).toBeDefined();
+    expect(data.work.length).toBeGreaterThan(0);
+    for (const item of data.work) {
+      expect(item.slug).toBeDefined();
+      expect(Array.isArray(item.tasks)).toBe(true);
     }
   });
 
@@ -157,12 +159,13 @@ describe("PATCH /api/tasks/:source", () => {
   let server: ReturnType<typeof createServer>;
   let tmpDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     port = 4000 + Math.floor(Math.random() * 1000);
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "backlogmd-patch-test-"));
     const fixtureSrc = path.resolve(__dirname, "../../../tests/fixtures/spec-v4");
     copyDirSync(fixtureSrc, tmpDir);
-    server = createServer(port, tmpDir);
+    const backlogmd = await Backlogmd.load({ rootDir: tmpDir });
+    server = createServer(port, tmpDir, { backlogmd });
   });
 
   afterEach(() => {
@@ -288,10 +291,11 @@ describe("POST /api/workers/assign", () => {
   let port: number;
   let server: ReturnType<typeof createServer>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     port = 5000 + Math.floor(Math.random() * 1000);
     const fixturePath = path.resolve(__dirname, "../../../tests/fixtures/spec-v4");
-    server = createServer(port, fixturePath);
+    const backlogmd = await Backlogmd.load({ rootDir: fixturePath });
+    server = createServer(port, fixturePath, { backlogmd });
   });
 
   afterEach(() => {

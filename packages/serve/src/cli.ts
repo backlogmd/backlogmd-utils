@@ -4,8 +4,7 @@ import "dotenv/config";
 import path from "path";
 import fs from "node:fs";
 import { fileURLToPath } from "url";
-// import { runWorkerLoop, PLANNER_ROLE } from "@backlogmd/workers";
-// import type { AppContext } from "./context.js";
+import { Backlogmd } from "@backlogmd/core";
 import { startServer } from "./index.js";
 import { resolveBacklogRoot } from "./shared/os.js";
 
@@ -74,9 +73,6 @@ export function parseArgs(argv: string[]): CliArgs {
 
 // const STAFF_ROLE = { id: "executor", name: "Executor" } as const;
 
-/** Start planner and staff in-process; they wait on the server queue (no poll loop). */
-const args = parseArgs(process.argv.slice(2));
-const backlogRoot = resolveBacklogRoot(args.rootDir);
 // function startAgentsInProcess(
 //   backlogRoot: string,
 //   host: string,
@@ -101,7 +97,7 @@ const backlogRoot = resolveBacklogRoot(args.rootDir);
 //   console.error("[serve] Started 2 agents in-process (event-driven, no poll loop)");
 // }
 
-export function run(argv: string[]): number {
+export async function run(argv: string[]): Promise<number> {
     let args: CliArgs;
     try {
         args = parseArgs(argv);
@@ -121,13 +117,20 @@ export function run(argv: string[]): number {
         return 1;
     }
 
+    const backlogRoot = resolveBacklogRoot(args.rootDir);
+    let backlogmd: Backlogmd;
+    try {
+        backlogmd = await Backlogmd.load({ rootDir: backlogRoot });
+    } catch (err) {
+        console.error("Failed to load backlog:", (err as Error).message);
+        return 1;
+    }
+
     const server = startServer({
         dir: backlogRoot,
         port: args.port,
         host: args.host,
-        // onListening: (ctx) => {
-        //   startAgentsInProcess(backlogRoot, args.host, args.port, ctx);
-        // },
+        backlogmd,
     });
 
     const url = `http://${args.host}:${args.port}`;
@@ -147,8 +150,7 @@ export function run(argv: string[]): number {
 }
 
 if (isMain) {
-    const exitCode = run(process.argv.slice(2));
-    if (exitCode !== 0) {
-        process.exit(exitCode);
-    }
+    run(process.argv.slice(2)).then((exitCode) => {
+        if (exitCode !== 0) process.exit(exitCode);
+    });
 }

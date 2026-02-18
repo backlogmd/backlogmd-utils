@@ -49,6 +49,8 @@ export interface ItemFolder {
     id?: string;
     /** The item slug (matches directory name) */
     slug: string;
+    /** Display title from METADATA work: (SPEC v4); undefined for legacy format */
+    work?: string;
     /** Conventional Commits type extracted from the slug, or null if absent */
     type: ItemType | null;
     /** Item status from index (SPEC v4) or undefined if not present */
@@ -157,12 +159,16 @@ export interface BacklogOutput {
 export interface WorkItem {
     /** The item slug (matches directory name) */
     slug: string;
+    /** Display title from METADATA work: (SPEC v4); undefined for legacy */
+    name?: string;
     /** Conventional Commits type extracted from the slug, or null if absent */
     type: ItemType | null;
     /** Task references parsed from the item's index.md */
     tasks: TaskRef[];
     /** Source file path relative to root (e.g. work/<slug>/index.md) */
     source: string;
+    /** Item-level assignee (SPEC v4 item index); when set, work is claimed by this agent */
+    assignee?: string;
 }
 
 /**
@@ -175,6 +181,8 @@ export interface BacklogmdDocument {
     rootDir: string;
     work: WorkItem[];
     tasks: Task[];
+    /** Default work directory (project root); used to set workDir on each WorkItemDto when present. */
+    workDir?: string;
     validation: {
         errors: ValidationIssue[];
         warnings: ValidationIssue[];
@@ -189,6 +197,8 @@ export interface TaskDto {
     priority: string;
     slug: string;
     itemSlug: string;
+    /** Source file path relative to root; use for API taskId in PATCH/DELETE. */
+    source?: string;
     dependsOn: string[];
     description: string;
     acceptanceCriteria: AcceptanceCriterion[];
@@ -200,7 +210,31 @@ export interface TaskDto {
 
 export interface WorkItemDto {
     slug: string;
+    /** Display title from item index work: metadata; use slug-derived name if absent */
+    name?: string;
     type: ItemType | null;
     status: WorkItemStatus;
     tasks: TaskDto[];
+    /** Item-level assignee (from item index); when set, work is claimed by this agent */
+    assignee?: string;
+    /**
+     * Absolute path of the directory to run work in (project root today; worktree path in future).
+     * Enables workers to use a different directory than the server when using worktrees.
+     */
+    workDir?: string;
+}
+
+/**
+ * DTO for the backlog document used by the server and API.
+ * Server and clients use only this and WorkItemDto / TaskDto; no parser/writer types.
+ */
+export interface BacklogStateDto {
+    protocol: string;
+    generatedAt: string;
+    rootDir: string;
+    validation: {
+        errors: ValidationIssue[];
+        warnings: ValidationIssue[];
+    };
+    work: WorkItemDto[];
 }

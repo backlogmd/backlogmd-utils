@@ -1,37 +1,9 @@
 import { useState, useEffect } from "react";
+import type { BacklogStateDto, TaskDto, WorkItemDto } from "@backlogmd/types";
 import { Column } from "./Column";
 import { AddWorkModal } from "./AddWorkModal";
 import { ItemDetailModal } from "./ItemDetailModal";
 import { useTaskStatusUpdate } from "../hooks/useTaskStatusUpdate";
-
-interface TaskRef {
-  slug: string;
-  fileName: string;
-}
-
-interface ItemFolder {
-  slug: string;
-  tasks: TaskRef[];
-  source: string;
-}
-
-interface Task {
-  name: string;
-  status: string;
-  priority: string;
-  slug: string;
-  itemSlug: string;
-  dependsOn: string[];
-  description: string;
-  acceptanceCriteria: { text: string; checked: boolean }[];
-  source: string;
-}
-
-interface BacklogData {
-  entries: { id?: string; slug: string; status?: string; assignee?: string }[];
-  items: ItemFolder[];
-  tasks: Task[];
-}
 
 /** Derive an item's column from task statuses when entry has no status (SPEC v4). */
 function deriveStatusFromTasks(taskStatuses: string[]): string {
@@ -48,19 +20,25 @@ function statusToColumn(status: string): string {
   return "in-progress";
 }
 
-/** Convert a slug like "001-feat-user-auth" to a display name. */
+/** Derive display name from slug when work item has no name (SPEC v4). */
 function slugToName(slug: string): string {
-  // Remove leading NNN- or NNN-type- prefix
   const cleaned = slug.replace(/^\d+-(?:feat|fix|refactor|chore)-/, "").replace(/^\d+-/, "");
   return cleaned.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** Extract the Conventional Commits type from a slug, or null if absent. */
+/** Extract Conventional Commits type from slug, or null if absent. */
 function slugToType(slug: string): string | null {
   const match = slug.match(/^\d+-(feat|fix|refactor|chore)-/);
   return match ? match[1] : null;
 }
 
+/** Item id from slug (leading 3+ digits). */
+function parseItemId(slug: string): string | undefined {
+  const m = slug.match(/^(\d{3,})/);
+  return m ? m[1] : undefined;
+}
+
+/** View model for a work item card/detail — built from WorkItemDto. */
 export interface DisplayItem {
   id?: string;
   slug: string;
@@ -68,7 +46,7 @@ export interface DisplayItem {
   type: string | null;
   status: string;
   assignee?: string;
-  tasks: Task[];
+  tasks: TaskDto[];
 }
 
 const columns = [
@@ -77,30 +55,21 @@ const columns = [
   { id: "done", title: "Done", color: "bg-col-done", icon: "●" },
 ] as const;
 
-export function Board({ data, searchQuery = "" }: { data: BacklogData; searchQuery?: string }) {
+export function Board({ data, searchQuery = "" }: { data: BacklogStateDto; searchQuery?: string }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<DisplayItem | null>(null);
   const { updateTaskStatus, pendingTasks } = useTaskStatusUpdate();
 
-  // Build display items from entries + items + tasks
-  const displayItems: DisplayItem[] = [];
-
-  for (const entry of data.entries) {
-    const folder = data.items.find((f) => f.slug === entry.slug);
-    const itemTasks = data.tasks.filter((t) => t.itemSlug === entry.slug);
-    const derived = deriveStatusFromTasks(itemTasks.map((t) => t.status));
-    const status = entry.status != null && entry.status !== "" ? entry.status : derived;
-
-    displayItems.push({
-      id: entry.id,
-      slug: entry.slug,
-      name: slugToName(entry.slug),
-      type: slugToType(entry.slug),
-      status,
-      assignee: entry.assignee,
-      tasks: itemTasks,
-    });
-  }
+  // Build display items from v4 source of truth (data.work)
+  const displayItems: DisplayItem[] = data.work.map((w: WorkItemDto): DisplayItem => ({
+    id: parseItemId(w.slug),
+    slug: w.slug,
+    name: w.name?.trim() ? w.name : slugToName(w.slug),
+    type: w.type ?? slugToType(w.slug),
+    status: w.status,
+    assignee: w.assignee,
+    tasks: w.tasks,
+  }));
 
   // Keep modal in sync when data refreshes via SSE
   useEffect(() => {

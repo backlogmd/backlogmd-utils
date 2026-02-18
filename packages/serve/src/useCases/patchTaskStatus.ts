@@ -1,6 +1,4 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import type { TaskStatus } from "@backlogmd/types";
-import { BacklogDocument } from "@backlogmd/writer";
 import { VALID_STATUSES } from "../lib/validStatuses.js";
 import type { AppContext } from "../context.js";
 
@@ -36,9 +34,7 @@ export async function patchTaskStatus(
   }
 
   try {
-    const doc = await BacklogDocument.load(ctx.backlogDir);
-    const changeset = doc.changeTaskStatus(taskSource, newStatus as TaskStatus);
-    await doc.commit(changeset);
+    await ctx.backlogmd.updateTaskStatus(taskSource, newStatus as import("@backlogmd/types").TaskStatus);
     ctx.notifyClients();
     await reply.type("application/json").send({ ok: true });
   } catch (err) {

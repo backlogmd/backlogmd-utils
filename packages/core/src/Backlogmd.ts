@@ -1,5 +1,6 @@
+import fs from "node:fs";
 import path from "node:path";
-import type { BacklogOutput, BacklogmdDocument, TaskStatus, WorkItemDto } from "@backlogmd/types";
+import type { BacklogOutput, BacklogmdDocument, BacklogStateDto, TaskStatus, WorkItem, WorkItemDto } from "@backlogmd/types";
 import { buildBacklogOutput } from "@backlogmd/parser";
 import { fromBacklogToDtos } from "./mappers/WorkItemsMapper.js";
 import {
@@ -29,25 +30,44 @@ export class Backlogmd {
         return new Backlogmd(absRoot, state);
     }
 
-    /** Current backlog state (from parser). Re-parsed after each mutation. */
-    getState(): BacklogOutput {
-        return this.state;
-    }
-
     getRootDir(): string {
         return this.rootDir;
     }
 
-    getPendingWork(): WorkItemDto[] {
+    /** Current backlog as DTO (source of truth for server/API). Re-parsed after each mutation and on reconcile(). */
+    getDocument(): BacklogStateDto {
+        const work: WorkItem[] = this.state.items.map((i) => ({
+            slug: i.slug,
+            name: i.work,
+            type: i.type,
+            tasks: i.tasks,
+            source: i.source,
+            assignee: i.assignee,
+        }));
+        const workDir = this.rootDir.endsWith(".backlogmd")
+            ? path.dirname(this.rootDir)
+            : this.rootDir;
         const doc: BacklogmdDocument = {
             protocol: this.state.protocol,
             generatedAt: this.state.generatedAt,
             rootDir: this.state.rootDir,
-            work: this.state.items,
+            work,
             tasks: this.state.tasks,
+            workDir,
             validation: this.state.validation,
         };
-        return fromBacklogToDtos(doc).filter((item) => item.status === "open");
+        return {
+            protocol: this.state.protocol,
+            generatedAt: this.state.generatedAt,
+            rootDir: this.state.rootDir,
+            validation: this.state.validation,
+            work: fromBacklogToDtos(doc),
+        };
+    }
+
+    /** Open work items only (status === "open"). */
+    getPendingWork(): WorkItemDto[] {
+        return this.getDocument().work.filter((item) => item.status === "open");
     }
 
     /** Re-read the backlog from disk (e.g. after switching branch). */
@@ -55,12 +75,12 @@ export class Backlogmd {
         this.state = buildBacklogOutput(this.rootDir);
     }
 
-    private async refreshState(): Promise<BacklogOutput> {
+    private async refreshState(): Promise<BacklogStateDto> {
         this.state = buildBacklogOutput(this.rootDir);
-        return this.state;
+        return this.getDocument();
     }
 
-    async closeTask(taskId: string): Promise<BacklogOutput> {
+    async closeTask(taskId: string): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             const doc = await BacklogDocument.load(this.rootDir);
             const changeset = doc.changeTaskStatus(taskId, "done");
@@ -69,7 +89,7 @@ export class Backlogmd {
         });
     }
 
-    async startTask(taskId: string): Promise<BacklogOutput> {
+    async startTask(taskId: string): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             const doc = await BacklogDocument.load(this.rootDir);
             const task = doc.model.tasks.find(
@@ -83,7 +103,7 @@ export class Backlogmd {
         });
     }
 
-    async updateTaskStatus(taskId: string, status: TaskStatus): Promise<BacklogOutput> {
+    async updateTaskStatus(taskId: string, status: TaskStatus): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             const doc = await BacklogDocument.load(this.rootDir);
             const changeset = doc.changeTaskStatus(taskId, status);
@@ -92,7 +112,7 @@ export class Backlogmd {
         });
     }
 
-    async addTask(itemSlug: string, input: TaskAddInput): Promise<BacklogOutput> {
+    async addTask(itemSlug: string, input: TaskAddInput): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             createTask(this.rootDir, itemSlug, input.title, {
                 status: input.status === "plan" ? "plan" : "open",
@@ -102,7 +122,7 @@ export class Backlogmd {
         });
     }
 
-    async removeTask(taskId: string): Promise<BacklogOutput> {
+    async removeTask(taskId: string): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             removeTaskFile(this.rootDir, taskId);
             return this.refreshState();
@@ -125,17 +145,40 @@ export class Backlogmd {
         };
     }
 
-    async updateTaskContent(
-        taskId: string,
-        _updates: Partial<TaskContent>,
-    ): Promise<BacklogOutput> {
+    /** Get the full file content of a task (METADATA + DESCRIPTION + ACCEPTANCE CRITERIA). */
+    async getTaskFileContent(taskSource: string): Promise<{ content: string }> {
+        const task = this.state.tasks.find(
+            (t) => t.source === taskSource || t.source === taskSource.replace(/\.md$/, ""),
+        );
+        if (!task) throw new Error(`Task "${taskSource}" not found`);
+        const absPath = path.join(this.rootDir, task.source ?? taskSource);
+        const content = fs.readFileSync(absPath, "utf-8");
+        return { content };
+    }
+
+    /** Overwrite the task file (full content); then re-parses and returns fresh state. */
+    async updateTaskFileContent(taskSource: string, content: string): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
-            // Writer does not yet expose patch description/acceptance; re-parse after no-op or extend writer later
+            const task = this.state.tasks.find(
+                (t) => t.source === taskSource || t.source === taskSource.replace(/\.md$/, ""),
+            );
+            if (!task?.source) throw new Error(`Task "${taskSource}" not found`);
+            const absPath = path.join(this.rootDir, task.source);
+            fs.writeFileSync(absPath, content, "utf-8");
             return this.refreshState();
         });
     }
 
-    async assignAgent(taskId: string, agentId: string): Promise<BacklogOutput> {
+    async updateTaskContent(
+        taskId: string,
+        _updates: Partial<TaskContent>,
+    ): Promise<BacklogStateDto> {
+        return this.queue.enqueue(async () => {
+            return this.refreshState();
+        });
+    }
+
+    async assignAgent(taskId: string, agentId: string): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             const doc = await BacklogDocument.load(this.rootDir);
             const changeset = doc.changeTaskAssignee(taskId, agentId);
@@ -144,7 +187,7 @@ export class Backlogmd {
         });
     }
 
-    async addItem(input: ItemAddInput): Promise<BacklogOutput> {
+    async addItem(input: ItemAddInput): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             createWorkItem(this.rootDir, input.title, input.type, {
                 description: input.description,
@@ -154,15 +197,35 @@ export class Backlogmd {
         });
     }
 
-    async removeItem(itemSlug: string): Promise<BacklogOutput> {
+    async removeItem(itemSlug: string): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             removeWorkItem(this.rootDir, itemSlug);
             return this.refreshState();
         });
     }
 
+    /** Get the full content of a work item index (METADATA YAML + DESCRIPTION + CONTEXT). */
+    async getItemContent(itemSlug: string): Promise<{ content: string }> {
+        const item = this.state.items.find((i) => i.slug === itemSlug);
+        if (!item) throw new Error(`Item "${itemSlug}" not found`);
+        const absPath = path.join(this.rootDir, item.source);
+        const content = fs.readFileSync(absPath, "utf-8");
+        return { content };
+    }
+
+    /** Overwrite the work item index.md (full file: METADATA YAML + body); then re-parses and returns fresh state. */
+    async updateItemContent(itemSlug: string, content: string): Promise<BacklogStateDto> {
+        return this.queue.enqueue(async () => {
+            const item = this.state.items.find((i) => i.slug === itemSlug);
+            if (!item) throw new Error(`Item "${itemSlug}" not found`);
+            const absPath = path.join(this.rootDir, item.source);
+            fs.writeFileSync(absPath, content, "utf-8");
+            return this.refreshState();
+        });
+    }
+
     /** Assign a work item to an agent (sets assignee in the item index). */
-    async assignItem(itemSlug: string, agentId: string): Promise<BacklogOutput> {
+    async assignItem(itemSlug: string, agentId: string): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             const doc = await BacklogDocument.load(this.rootDir);
             const changeset = doc.changeItemAssignee(itemSlug, agentId);
@@ -171,7 +234,7 @@ export class Backlogmd {
         });
     }
 
-    async archiveItem(itemSlug: string): Promise<BacklogOutput> {
+    async archiveItem(itemSlug: string): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             // Writer does not yet expose archive; for now same as remove or extend writer later
             removeWorkItem(this.rootDir, itemSlug);
@@ -182,14 +245,14 @@ export class Backlogmd {
     async updateItemStatus(
         _itemSlug: string,
         _status: "open" | "archived",
-    ): Promise<BacklogOutput> {
+    ): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             // Writer does not yet expose patch item index status; extend writer later
             return this.refreshState();
         });
     }
 
-    async resetItemTasks(itemSlug: string): Promise<BacklogOutput> {
+    async resetItemTasks(itemSlug: string): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             const doc = await BacklogDocument.load(this.rootDir);
             const tasksToReset = doc.model.tasks.filter(

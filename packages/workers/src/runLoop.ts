@@ -1,22 +1,44 @@
 import path from "path";
 import fs from "node:fs";
-import http from "node:http";
 import { BacklogCore } from "@backlogmd/core";
 import { Worker } from "./workerRunner.js";
 import { WorkerReporter } from "./reporter.js";
+import { BacklogHttpClient } from "./backlogmdClient.js";
 import { OpenCodeAgent } from "./agents/opencode.js";
+import { AgentEmulator } from "./agents/agentEmulator.js";
 import { GitProvider } from "@backlogmd/vcs";
 import type { WorkerRole } from "./types.js";
-import { PLANNER_ROLE } from "./types.js";
+import { PLANNER_ROLE } from "./constants.js";
 
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
 
+/** Resolve to the directory that contains work/ (same as serve: prefer .backlogmd). */
+function resolveBacklogRoot(dir: string): string {
+    const resolved = path.resolve(dir);
+    const dotBacklogmd = path.join(resolved, ".backlogmd");
+    const workAtRoot = path.join(resolved, "work");
+    if (fs.existsSync(dotBacklogmd)) return dotBacklogmd;
+    if (fs.existsSync(workAtRoot)) return resolved;
+    return resolved;
+}
+
 export interface WorkerLoopOptions {
-    workDir: string;
+    /** Path to .backlogmd directory (or project root). */
+    backlogDir: string;
     serverUrl?: string;
     name?: string;
     role?: WorkerRole;
     pollIntervalMs?: number;
+    /** If set, run this task once and exit. */
+    taskId?: string;
+    /** When set, wait on this promise instead of polling (event-driven). */
+    getWorkTrigger?: () => Promise<void>;
+    autoCommit?: boolean;
+    autoPush?: boolean;
+    /** Dry run: run agent but do not write to backlog or VCS (for happy-path testing). */
+    dry?: boolean;
+    /** Use agent emulator (setTimeout + success) instead of OpenCode; good with --dry for happy-path tests. */
+    agent?: "opencode" | "emulator";
 }
 
 const DEFAULT_ROLES: WorkerRole[] = [PLANNER_ROLE, { id: "executor", name: "Executor" }];
@@ -42,27 +64,38 @@ function sanitizeForBranch(s: string): string {
  * Never returns when taskId is not set; runs until process exits.
  */
 export async function runWorkerLoop(opts: WorkerLoopOptions): Promise<void> {
-    const rootDir = path.resolve(opts.backlogDir);
+    const backlogRoot = resolveBacklogRoot(opts.backlogDir);
     const name = opts.name ?? `dev-${Date.now()}`;
     const role = opts.role ?? DEFAULT_ROLES[0];
     const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
 
-    console.log(`[worker:${name}] Loading backlog from: ${rootDir}`);
+    console.log(`[worker:${name}] Loading backlog from: ${backlogRoot}`);
     console.log(`[worker:${name}] Role: ${role.id}`);
+    if (opts.dry) {
+        console.log(`[worker:${name}] Dry run: no backlog or VCS writes`);
+    }
 
-    const core = await BacklogCore.load({ rootDir });
+    const core = await BacklogCore.load({ rootDir: backlogRoot });
 
     let reporter: WorkerReporter | undefined;
+    let serverClient: BacklogHttpClient | undefined;
     if (opts.serverUrl) {
         reporter = new WorkerReporter(opts.serverUrl, {
             name,
             role: role.id,
         });
+        serverClient = new BacklogHttpClient(opts.serverUrl);
     }
 
-    const agent = new OpenCodeAgent(undefined, path.dirname(rootDir), role, reporter);
+    const useEmulator = opts.agent === "emulator";
+    const agent = useEmulator
+        ? new AgentEmulator(path.dirname(backlogRoot), role, { delayMs: 2000 })
+        : new OpenCodeAgent(undefined, path.dirname(backlogRoot), role, reporter);
+    if (useEmulator) {
+        console.log(`[worker:${name}] Agent: emulator (simulated work, 2s per task)`);
+    }
 
-    const gitRoot = rootDir.endsWith(".backlogmd") ? path.dirname(rootDir) : rootDir;
+    const gitRoot = backlogRoot.endsWith(".backlogmd") ? path.dirname(backlogRoot) : backlogRoot;
     let vcs: GitProvider | undefined;
     if (opts.serverUrl || opts.autoCommit || opts.autoPush) {
         vcs = new GitProvider(gitRoot);
@@ -79,6 +112,7 @@ export async function runWorkerLoop(opts: WorkerLoopOptions): Promise<void> {
         },
         reporter,
         role,
+        opts.dry,
     );
 
     if (opts.taskId) {
@@ -97,31 +131,10 @@ export async function runWorkerLoop(opts: WorkerLoopOptions): Promise<void> {
             await getTrigger();
         }
         let didAssignedWork = false;
-        if (opts.serverUrl) {
+        if (serverClient) {
             try {
-                const url = new URL("/api/workers/assignments", opts.serverUrl);
-                url.searchParams.set("name", name);
-                const { statusCode, body } = await new Promise<{
-                    statusCode: number;
-                    body: string;
-                }>((resolve, reject) => {
-                    const req = http.get(url.toString(), (res) => {
-                        let data = "";
-                        const stream = res as unknown as {
-                            on(ev: string, fn: (chunk: Buffer | string) => void): void;
-                        };
-                        stream.on("data", (chunk) => (data += chunk.toString()));
-                        stream.on("end", () =>
-                            resolve({ statusCode: res.statusCode ?? 0, body: data }),
-                        );
-                    });
-                    req.on("error", reject);
-                });
+                const { statusCode, assignments: list } = await serverClient.getAssignments(name);
                 if (statusCode === 200) {
-                    const json = JSON.parse(body) as {
-                        assignments?: Array<{ taskId?: string; itemId?: string }>;
-                    };
-                    const list = json.assignments ?? [];
                     if (list.length === 0) {
                         console.log(`[worker:${name}] Available work: none`);
                     } else {
@@ -160,6 +173,7 @@ export async function runWorkerLoop(opts: WorkerLoopOptions): Promise<void> {
                                         },
                                         reporter,
                                         role,
+                                        opts.dry,
                                     );
                                 }
                             }

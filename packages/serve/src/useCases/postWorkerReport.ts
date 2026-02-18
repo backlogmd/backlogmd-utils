@@ -1,5 +1,4 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { BacklogDocument } from "@backlogmd/writer";
 import type { AppContext, WorkerReportBody } from "../context.js";
 
 /**
@@ -14,24 +13,30 @@ async function updateBacklogInProgress(ctx: AppContext, body: WorkerReportBody):
   if (!taskId && !itemId) return false;
 
   try {
-    const doc = await BacklogDocument.load(ctx.backlogDir);
+    const doc = ctx.backlogmd.getDocument();
     let taskSource: string | undefined;
     if (taskId) {
-      const task = doc.model.tasks.find(
-        (t) => t.source === taskId || t.slug === taskId,
-      );
-      taskSource = task?.source;
+      for (const item of doc.work) {
+        const task = item.tasks.find(
+          (t) => t.source === taskId || t.slug === taskId,
+        );
+        if (task) {
+          taskSource = task.source ?? `${task.itemSlug}/${task.slug}`;
+          break;
+        }
+      }
     } else if (itemId) {
-      const task = doc.model.tasks.find(
-        (t) =>
-          (t.itemSlug === itemId || t.itemSlug.startsWith(itemId + "-")) &&
-          t.status !== "done",
-      );
-      taskSource = task?.source;
+      for (const item of doc.work) {
+        if (item.slug !== itemId && !item.slug.startsWith(itemId + "-")) continue;
+        const task = item.tasks.find((t) => t.status !== "done");
+        if (task) {
+          taskSource = task.source ?? `${task.itemSlug}/${task.slug}`;
+          break;
+        }
+      }
     }
     if (taskSource) {
-      const changeset = doc.changeTaskStatus(taskSource, "in-progress");
-      await doc.commit(changeset);
+      await ctx.backlogmd.updateTaskStatus(taskSource, "in-progress");
       ctx.notifyClients();
       return true;
     }

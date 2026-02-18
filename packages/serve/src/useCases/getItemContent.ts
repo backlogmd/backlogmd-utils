@@ -6,10 +6,10 @@ interface Params {
 }
 
 /**
- * DELETE /api/items/:encodedSlug
- * Removes the work item directory (work/<slug>/ including index.md and all task files).
+ * GET /api/items/:encodedSlug/content
+ * Returns the plain-text body of the work item index (DESCRIPTION, CONTEXT, etc.).
  */
-export async function deleteItem(
+export async function getItemContent(
   ctx: AppContext,
   request: FastifyRequest<{ Params: Params }>,
   reply: FastifyReply,
@@ -22,15 +22,14 @@ export async function deleteItem(
   }
 
   try {
-    await ctx.backlogmd.removeItem(slug);
-    ctx.notifyClients();
-    await reply.code(200).type("application/json").send({ ok: true });
+    const { content } = await ctx.backlogmd.getItemContent(slug);
+    await reply.type("application/json").send({ content });
   } catch (err) {
     const message = (err as Error).message;
     if (message.includes("not found")) {
       await reply.code(404).type("application/json").send({ error: message });
     } else {
-      console.error("[backlogmd-serve] deleteItem error:", message);
+      console.error("[backlogmd-serve] getItemContent error:", message);
       await reply.code(500).type("application/json").send({ error: message });
     }
   }

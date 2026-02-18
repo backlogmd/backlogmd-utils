@@ -1,4 +1,4 @@
-// export { parseBacklog, getTask, getWorkContext } from "./worker.js";
+export { parseBacklog, getTask, getWorkContext } from "./worker.js";
 // //export { Worker } from "./workerRunner.js";
 // // export { WorkerReporter } from "./reporter.js";
 // //export { spawnWorker } from "./spawnWorker.js";
@@ -8,5 +8,5 @@
 export type { WorkerRole, AgentTask, AgentResult, CodeAgent } from "./types.js";
 // //export type { WorkerLoopOptions } from "./runLoop.js";
 // //export { PLANNER_ROLE } from "./types.js";
-export { SmokeAgent } from "./agents/index.js";
+export { AgentEmulator } from "./agents/index.js";
 export { OpenCodeAgent } from "./agents/index.js";

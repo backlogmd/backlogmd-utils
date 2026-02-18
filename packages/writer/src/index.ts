@@ -1,6 +1,10 @@
 export { BacklogDocument } from "./document.js";
 export { applyChangeset } from "./apply.js";
-export { patchMetadataField } from "./patch.js";
+export {
+  patchMetadataField,
+  getItemIndexBody,
+  setItemIndexBody,
+} from "./patch.js";
 export { deriveItemStatus } from "./derive.js";
 export {
   createWorkItem,

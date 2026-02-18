@@ -15,6 +15,8 @@ export interface ServerResult {
 }
 
 export interface CreateServerOptions {
+  /** Backlogmd instance (source of truth); must be loaded before calling createServer. */
+  backlogmd: import("@backlogmd/core").Backlogmd;
   /** Called when the server is listening; receives ctx so workers can register for work triggers. */
   onListening?: (ctx: AppContext) => void;
 }
@@ -22,9 +24,9 @@ export interface CreateServerOptions {
 export function createServer(
   port: number,
   backlogDir: string,
-  options: CreateServerOptions = {},
+  options: CreateServerOptions,
 ): ServerResult {
-  const { onListening } = options;
+  const { backlogmd, onListening } = options;
   const clients = new Set<ServerResponse>();
 
   const broadcastWorkerUpdate = (payload: WorkerReportBody): void => {
@@ -122,6 +124,7 @@ export function createServer(
 
   const ctx: AppContext = {
     backlogDir,
+    backlogmd,
     getChatAgent: () => Promise.resolve(null),
     notifyClients,
     broadcastWorkerUpdate,

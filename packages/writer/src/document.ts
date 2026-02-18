@@ -6,7 +6,11 @@ import {
 } from "@backlogmd/types";
 import { buildBacklogOutput } from "@backlogmd/parser";
 import type { Changeset, FileCache, FilePatch } from "./types.js";
-import { patchMetadataField, patchItemIndexMetadataField } from "./patch.js";
+import {
+  patchMetadataField,
+  patchOrAddTaskMetadataField,
+  patchItemIndexMetadataField,
+} from "./patch.js";
 import { applyChangeset } from "./apply.js";
 
 /** Deep clone for BacklogOutput (JSON-serializable; no DOM). */
@@ -176,16 +180,7 @@ export class BacklogDocument {
     if (!task) throw new Error(`Task "${taskId}" not found in the model`);
     const taskFileContent = this._cache.get(task.source);
     if (!taskFileContent) throw new Error(`Task file "${task.source}" not found in cache`);
-    let taskPatch: { patched: string; original: string; replacement: string };
-    try {
-      taskPatch = patchMetadataField(taskFileContent, "assignee", assignee);
-    } catch {
-      return {
-        patches: [],
-        modelBefore: deepClone(this._model),
-        modelAfter: deepClone(this._model),
-      };
-    }
+    const taskPatch = patchOrAddTaskMetadataField(taskFileContent, "assignee", assignee);
     const modelAfter: BacklogOutput = deepClone(this._model);
     const modelTask = modelAfter.tasks.find((t) => t.source === task.source)!;
     modelTask.assignee = assignee;

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import fs from "fs";
 import http from "node:http";
 import type { CodeAgent, AgentTask, AgentResult, WorkerRole } from "../types.js";
+import type { WorkerReporter } from "../reporter.js";
 
 const DEFAULT_JSON_INSTRUCTION = `
 IMPORTANT: Be proactive and find solutions without human intervention.
@@ -32,11 +33,18 @@ export class OpenCodeAgent implements CodeAgent {
     private webhookUrl?: string;
     private cwd?: string;
     private role?: WorkerRole;
+    private reporter?: WorkerReporter;
 
-    constructor(webhookUrl?: string, cwd?: string, role?: WorkerRole) {
+    constructor(
+        webhookUrl?: string,
+        cwd?: string,
+        role?: WorkerRole,
+        reporter?: WorkerReporter,
+    ) {
         this.webhookUrl = webhookUrl;
         this.cwd = cwd;
         this.role = role;
+        this.reporter = reporter;
     }
 
     private sendMessage(content: string) {

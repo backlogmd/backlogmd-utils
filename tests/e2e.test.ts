@@ -3,32 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import http from "node:http";
-import { createServer } from "@backlogmd/serve";
+import { Backlogmd } from "@backlogmd/core";
+import { startServer } from "@backlogmd/serve";
 import { BacklogDocument } from "@backlogmd/writer";
-
-// ─── Types for API response ──────────────────────────────────────────
-
-interface BacklogApiResponse {
-    protocol: string;
-    entries: { slug: string }[];
-    items: {
-        slug: string;
-        tasks: { slug: string; fileName: string }[];
-        source: string;
-    }[];
-    tasks: {
-        name: string;
-        status: string;
-        priority: string;
-        slug: string;
-        itemSlug: string;
-        source: string;
-    }[];
-    validation: {
-        errors: { code: string; message: string }[];
-        warnings: { code: string; message: string }[];
-    };
-}
+import type { BacklogStateDto } from "@backlogmd/types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -94,9 +72,9 @@ function scaffoldBacklog(dir: string): void {
 }
 
 /**
- * Fetch the backlog JSON from the running server.
+ * Fetch the backlog JSON from the running server (BacklogStateDto).
  */
-async function fetchBacklog(port: number): Promise<BacklogApiResponse> {
+async function fetchBacklog(port: number): Promise<BacklogStateDto> {
     return new Promise((resolve, reject) => {
         const req = http.get(`http://localhost:${port}/api/backlog`, (res) => {
             let body = "";
@@ -127,11 +105,12 @@ function deriveItemColumn(taskStatuses: string[]): string {
 }
 
 /**
- * Get the derived column for an item from the API response data.
+ * Get the derived column for an item from the API response (BacklogStateDto).
  */
-function getItemColumn(data: BacklogApiResponse, itemSlug: string): string {
-    const itemTasks = data.tasks.filter((t) => t.itemSlug === itemSlug);
-    return deriveItemColumn(itemTasks.map((t) => t.status));
+function getItemColumn(data: BacklogStateDto, itemSlug: string): string {
+    const item = data.work.find((w) => w.slug === itemSlug);
+    if (!item) return "open";
+    return deriveItemColumn(item.tasks.map((t) => t.status));
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────
@@ -139,7 +118,7 @@ function getItemColumn(data: BacklogApiResponse, itemSlug: string): string {
 describe("e2e: write → dashboard → update → column movement", () => {
     let tmpDir: string;
     let port: number;
-    let server: ReturnType<typeof createServer>;
+    let server: ReturnType<typeof startServer>;
     let doc: BacklogDocument;
 
     const ITEM_SLUG = "001-feat-dashboard-flow";
@@ -149,7 +128,8 @@ describe("e2e: write → dashboard → update → column movement", () => {
         scaffoldBacklog(tmpDir);
 
         port = 4000 + Math.floor(Math.random() * 1000);
-        server = createServer(port, tmpDir);
+        const backlogmd = await Backlogmd.load({ rootDir: tmpDir });
+        server = startServer({ dir: tmpDir, port, backlogmd });
 
         // Wait for the server to start listening
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -167,13 +147,13 @@ describe("e2e: write → dashboard → update → column movement", () => {
     it("newly created feature appears in Open column", async () => {
         const data = await fetchBacklog(port);
 
-        // The scaffolded item appears in the backlog
-        expect(data.entries).toHaveLength(1);
-        expect(data.entries[0].slug).toBe(ITEM_SLUG);
+        // The scaffolded item appears in the backlog (v4: data.work)
+        expect(data.work).toHaveLength(1);
+        expect(data.work[0].slug).toBe(ITEM_SLUG);
 
         // Both tasks are open
-        expect(data.tasks).toHaveLength(2);
-        expect(data.tasks.every((t) => t.status === "open")).toBe(true);
+        expect(data.work[0].tasks).toHaveLength(2);
+        expect(data.work[0].tasks.every((t) => t.status === "open")).toBe(true);
 
         // Item derives to the "open" column
         expect(getItemColumn(data, ITEM_SLUG)).toBe("open");
@@ -190,7 +170,8 @@ describe("e2e: write → dashboard → update → column movement", () => {
 
         const data = await fetchBacklog(port);
 
-        const task001 = data.tasks.find((t) => t.priority === "001")!;
+        const item = data.work.find((w) => w.slug === ITEM_SLUG)!;
+        const task001 = item.tasks.find((t) => t.priority === "001")!;
         expect(task001.status).toBe("in-progress");
 
         // Mixed statuses → "in-progress" column
@@ -208,7 +189,8 @@ describe("e2e: write → dashboard → update → column movement", () => {
 
         const data = await fetchBacklog(port);
 
-        expect(data.tasks.every((t) => t.status === "done")).toBe(true);
+        const item = data.work.find((w) => w.slug === ITEM_SLUG)!;
+        expect(item.tasks.every((t) => t.status === "done")).toBe(true);
 
         // All done → "done" column
         expect(getItemColumn(data, ITEM_SLUG)).toBe("done");

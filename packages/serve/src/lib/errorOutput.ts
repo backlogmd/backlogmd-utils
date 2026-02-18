@@ -1,17 +1,14 @@
-import type { BacklogOutput } from "@backlogmd/types";
+import type { BacklogStateDto } from "@backlogmd/types";
 
 /**
- * Build an empty BacklogOutput with a single error entry.
+ * Build a minimal BacklogStateDto with a single error entry.
  * Used as a fallback when the parser fails catastrophically.
  */
-export function errorOutput(backlogDir: string, err: Error): BacklogOutput {
+export function errorBacklogStateDto(backlogDir: string, err: Error): BacklogStateDto {
   return {
     protocol: "backlogmd/v2",
     generatedAt: new Date().toISOString(),
     rootDir: backlogDir,
-    entries: [],
-    items: [],
-    tasks: [],
     validation: {
       errors: [
         {
@@ -22,5 +19,6 @@ export function errorOutput(backlogDir: string, err: Error): BacklogOutput {
       ],
       warnings: [],
     },
+    work: [],
   };
 }

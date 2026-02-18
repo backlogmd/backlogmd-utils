@@ -3,8 +3,12 @@ import type { AppContext, WorkerReportBody } from "./context.js";
 import { getIndexPage } from "./useCases/getIndexPage.js";
 import { getBacklog } from "./useCases/getBacklog.js";
 import { patchTaskStatus } from "./useCases/patchTaskStatus.js";
+import { getTaskContent } from "./useCases/getTaskContent.js";
+import { putTaskContent } from "./useCases/putTaskContent.js";
 import { deleteTask } from "./useCases/deleteTask.js";
 import { deleteItem } from "./useCases/deleteItem.js";
+import { getItemContent } from "./useCases/getItemContent.js";
+import { putItemContent } from "./useCases/putItemContent.js";
 import { postChat } from "./useCases/postChat.js";
 import { getEvents } from "./useCases/getEvents.js";
 import { postWorkerReport } from "./useCases/postWorkerReport.js";
@@ -25,11 +29,27 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   }>("/api/tasks/:encodedSource", (req, reply) =>
     patchTaskStatus(ctx, req as never, reply),
   );
+  app.get<{ Params: { encodedSource: string } }>(
+    "/api/tasks/:encodedSource/content",
+    (req, reply) => getTaskContent(ctx, req as never, reply),
+  );
+  app.put<{ Params: { encodedSource: string }; Body: { content?: string } }>(
+    "/api/tasks/:encodedSource/content",
+    (req, reply) => putTaskContent(ctx, req as never, reply),
+  );
   app.delete<{ Params: { encodedSource: string } }>(
     "/api/tasks/:encodedSource",
     (req, reply) => deleteTask(ctx, req as never, reply),
   );
 
+  app.get<{ Params: { encodedSlug: string } }>(
+    "/api/items/:encodedSlug/content",
+    (req, reply) => getItemContent(ctx, req as never, reply),
+  );
+  app.put<{ Params: { encodedSlug: string }; Body: { content?: string } }>(
+    "/api/items/:encodedSlug/content",
+    (req, reply) => putItemContent(ctx, req as never, reply),
+  );
   app.delete<{ Params: { encodedSlug: string } }>(
     "/api/items/:encodedSlug",
     (req, reply) => deleteItem(ctx, req as never, reply),

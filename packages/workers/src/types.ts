@@ -26,7 +26,12 @@ export interface AgentTask {
     title: string;
     description: string;
     acceptanceCriteria: { text: string; checked: boolean }[];
-    feedback: string[];
+    feedback?: string[];
+    /** Source file path (for updateTaskStatus, etc.). */
+    source?: string;
+    itemSlug?: string;
+    /** When true, planner runs without changing task status. */
+    executeOnly?: boolean;
 }
 
 export interface AgentWorkItem {
@@ -50,5 +55,5 @@ export interface AgentResult {
 
 export interface CodeAgent {
     name: string;
-    execute(workDir: string, workItem: AgentWorkItem): Promise<AgentResult>;
+    execute(task: AgentTask): Promise<AgentResult>;
 }

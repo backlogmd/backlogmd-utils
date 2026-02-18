@@ -1,4 +1,5 @@
 import type { ServerResponse } from "node:http";
+import type { Backlogmd } from "@backlogmd/core";
 
 export type { WorkerReportBody, WorkerState } from "./workerRegistry.js";
 import type { WorkerReportBody, WorkerState } from "./workerRegistry.js";
@@ -6,6 +7,8 @@ import type { AssignmentMessage } from "./assignmentQueue.js";
 
 export interface AppContext {
     backlogDir: string;
+    /** Single source of truth for backlog state; all reads/writes go through this. */
+    backlogmd: Backlogmd;
     notifyClients: () => void;
     /** Broadcast a worker update to all SSE clients. */
     broadcastWorkerUpdate: (payload: WorkerReportBody) => void;

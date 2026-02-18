@@ -157,9 +157,11 @@ export function buildBacklogmdDocument(rootDir: string): BacklogmdDocument {
   const output = buildBacklogOutput(rootDir);
   const work: WorkItem[] = output.items.map((item) => ({
     slug: item.slug,
+    name: item.work,
     type: item.type,
     tasks: item.tasks,
     source: item.source,
+    assignee: item.assignee,
   }));
   return {
     protocol: output.protocol,

@@ -1,5 +1,4 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { buildBacklogOutput } from "@backlogmd/parser";
 import type { AppContext } from "../context.js";
 
 /**
@@ -30,9 +29,9 @@ export async function getWorkerAssignments(
     return assignee === name || assignee.startsWith(name + ":");
   }
 
-  let output;
+  let doc;
   try {
-    output = buildBacklogOutput(ctx.backlogDir);
+    doc = ctx.backlogmd.getDocument();
   } catch (err) {
     console.error("[backlogmd-serve] Assignments parse error:", (err as Error).message);
     await reply.code(500).type("application/json").send({
@@ -45,49 +44,54 @@ export async function getWorkerAssignments(
   const debug = process.env.BACKLOGMD_DEBUG_ASSIGNMENTS === "1";
 
   if (debug) {
-    console.log(`[assignments] name=${name} backlogDir=${ctx.backlogDir} entries=${output.entries.length} tasks=${output.tasks.length}`);
-    for (const e of output.entries) {
-      const match = assigneeMatches(e.assignee);
-      if (match || e.assignee) {
-        console.log(`[assignments] entry ${e.slug} assignee=${e.assignee ?? "(none)"} match=${match} status=${e.status}`);
+    const totalTasks = doc.work.reduce((n, w) => n + w.tasks.length, 0);
+    console.log(`[assignments] name=${name} backlogDir=${ctx.backlogDir} work=${doc.work.length} tasks=${totalTasks}`);
+    for (const w of doc.work) {
+      const taskAssignees = w.tasks.map((t) => t.assignee).filter(Boolean);
+      const match = taskAssignees.some((a) => assigneeMatches(a));
+      if (match || taskAssignees.length) {
+        console.log(`[assignments] item ${w.slug} status=${w.status} match=${match}`);
       }
     }
   }
 
-  // Only return work that is not done and not in-progress so workers don't re-pick the same work.
-  for (const task of output.tasks) {
-    if (
-      assigneeMatches(task.assignee) &&
-      task.status !== "done" &&
-      task.status !== "in-progress"
-    ) {
-      assignments.push({ taskId: task.source, itemId: task.itemSlug });
+  for (const item of doc.work) {
+    for (const task of item.tasks) {
+      if (
+        assigneeMatches(task.assignee) &&
+        task.status !== "done" &&
+        task.status !== "in-progress"
+      ) {
+        const taskId = task.source ?? `${task.itemSlug}/${task.slug}`;
+        assignments.push({ taskId, itemId: task.itemSlug });
+      }
     }
   }
-  for (const entry of output.entries) {
-    if (!assigneeMatches(entry.assignee) || entry.status === "done") continue;
-    if (ctx.isItemClaimed(entry.slug)) {
-      if (debug) console.log(`[assignments] skip ${entry.slug}: claimed`);
+  for (const item of doc.work) {
+    const itemAssignedToWorker =
+      assigneeMatches(item.assignee) || item.tasks.some((t) => assigneeMatches(t.assignee));
+    if (!itemAssignedToWorker || item.status === "done") continue;
+    if (ctx.isItemClaimed(item.slug)) {
+      if (debug) console.log(`[assignments] skip ${item.slug}: claimed`);
       continue;
     }
-    const tasksForItem = output.tasks.filter((t) => t.itemSlug === entry.slug);
-    const allTasksDone = tasksForItem.length > 0 && tasksForItem.every((t) => t.status === "done");
+    const allTasksDone =
+      item.tasks.length > 0 && item.tasks.every((t) => t.status === "done");
     if (allTasksDone) {
-      if (debug) console.log(`[assignments] skip ${entry.slug}: allTasksDone`);
+      if (debug) console.log(`[assignments] skip ${item.slug}: allTasksDone`);
       continue;
     }
-    // Don't show item if any task is in-progress (worker already claimed it via report).
-    const anyInProgress = tasksForItem.some((t) => t.status === "in-progress");
+    const anyInProgress = item.tasks.some((t) => t.status === "in-progress");
     if (anyInProgress) {
-      if (debug) console.log(`[assignments] skip ${entry.slug}: anyInProgress`);
+      if (debug) console.log(`[assignments] skip ${item.slug}: anyInProgress`);
       continue;
     }
     const alreadyHasTaskForItem = assignments.some(
-      (a) => a.itemId === entry.slug && a.taskId != null,
+      (a) => a.itemId === item.slug && a.taskId != null,
     );
     if (!alreadyHasTaskForItem) {
-      assignments.push({ itemId: entry.slug });
-      if (debug) console.log(`[assignments] add itemId=${entry.slug}`);
+      assignments.push({ itemId: item.slug });
+      if (debug) console.log(`[assignments] add itemId=${item.slug}`);
     }
   }
 

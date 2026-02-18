@@ -1,7 +1,6 @@
 import path from "node:path";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { GitProvider } from "@backlogmd/vcs";
-import { BacklogDocument } from "@backlogmd/writer";
 import type { AppContext } from "../context.js";
 
 export interface AssignWorkBody {
@@ -93,17 +92,14 @@ export async function postAssignWork(
   }
 
   try {
-    const doc = await BacklogDocument.load(ctx.backlogDir);
     if (taskId) {
-      const changeset = doc.changeTaskAssignee(taskId, workerId);
-      await doc.commit(changeset);
+      await ctx.backlogmd.assignAgent(taskId, workerId);
       if (process.env.BACKLOGMD_DEBUG_ASSIGNMENTS === "1") {
         console.log(`[assign] task assignee written workerId=${workerId} taskId=${taskId} backlogDir=${ctx.backlogDir}`);
       }
     }
     if (itemId) {
-      const changeset = doc.changeItemAssignee(itemId, workerId);
-      await doc.commit(changeset);
+      await ctx.backlogmd.assignItem(itemId, workerId);
       if (process.env.BACKLOGMD_DEBUG_ASSIGNMENTS === "1") {
         console.log(`[assign] item assignee written workerId=${workerId} itemId=${itemId} backlogDir=${ctx.backlogDir}`);
       }

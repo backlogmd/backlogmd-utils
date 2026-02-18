@@ -6,10 +6,10 @@ interface Params {
 }
 
 /**
- * DELETE /api/tasks/:encodedSource
- * Removes the task file (and its feedback file if present) from the backlog.
+ * GET /api/tasks/:encodedSource/content
+ * Returns the full file content of the task (METADATA + DESCRIPTION + ACCEPTANCE CRITERIA).
  */
-export async function deleteTask(
+export async function getTaskContent(
   ctx: AppContext,
   request: FastifyRequest<{ Params: Params }>,
   reply: FastifyReply,
@@ -24,15 +24,14 @@ export async function deleteTask(
   }
 
   try {
-    await ctx.backlogmd.removeTask(taskSource);
-    ctx.notifyClients();
-    await reply.code(200).type("application/json").send({ ok: true });
+    const { content } = await ctx.backlogmd.getTaskFileContent(taskSource);
+    await reply.type("application/json").send({ content });
   } catch (err) {
     const message = (err as Error).message;
     if (message.includes("not found")) {
       await reply.code(404).type("application/json").send({ error: message });
     } else {
-      console.error("[backlogmd-serve] deleteTask error:", message);
+      console.error("[backlogmd-serve] getTaskContent error:", message);
       await reply.code(500).type("application/json").send({ error: message });
     }
   }
