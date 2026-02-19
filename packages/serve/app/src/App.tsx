@@ -9,6 +9,7 @@ export function App() {
   const { data, connected, errors, warnings, workerCount } = useBacklog();
   const [searchQuery, setSearchQuery] = useState("");
   const [workersPopoverOpen, setWorkersPopoverOpen] = useState(false);
+  const [chatExpanded, setChatExpanded] = useState(false);
   const workersAnchorRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -67,11 +68,24 @@ export function App() {
         </div>
       </header>
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
         {typeof window !== "undefined" && window.__CHAT_ENABLED__ === true && (
-          <div className="h-full shrink-0 flex min-w-0">
-            <ChatSidebar />
-          </div>
+          <>
+            {chatExpanded ? (
+              <div className="h-full shrink-0 flex min-w-0">
+                <ChatSidebar onCollapse={() => setChatExpanded(false)} />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setChatExpanded(true)}
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-8 h-16 flex items-center justify-center rounded-l-lg border border-r-0 border-slate-200 bg-white shadow-sm hover:bg-slate-50 text-slate-600 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset"
+                aria-label="Open chat"
+              >
+                <span className="text-xs font-medium -rotate-90 whitespace-nowrap">Chat</span>
+              </button>
+            )}
+          </>
         )}
         <main className="flex-1 min-w-0 max-w-7xl mx-auto px-6 py-8 overflow-auto">
           {data ? (

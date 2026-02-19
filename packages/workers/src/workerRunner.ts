@@ -77,23 +77,26 @@ export class Worker {
     console.log(`[worker] Task ${taskId} not found or not in plan status`);
   }
 
-  async runWorkById(workIdentifier: string): Promise<void> {
+  /** Run all non-done tasks for a work item (when UI assigns by itemId). */
+  async runItemById(itemId: string): Promise<void> {
     const state = this.core.getState();
     const item = state.items.find(
       (i) =>
-        i.slug.split("-")[0] === workIdentifier ||
-        i.slug === workIdentifier ||
-        i.slug.toLowerCase() === workIdentifier.toLowerCase(),
+        i.slug.split("-")[0] === itemId ||
+        i.slug === itemId ||
+        i.slug.toLowerCase() === itemId.toLowerCase(),
     );
 
     if (!item) {
-      console.error(`[worker] Work "${workIdentifier}" not found`);
+      console.error(`[worker] Item "${itemId}" not found`);
       return;
     }
 
-    console.log(`[worker] Executing work: ${item.slug}`);
+    console.log(`[worker] Executing item: ${item.slug}`);
 
-    const tasksForItem = state.tasks.filter((t) => t.itemSlug === item.slug);
+    const tasksForItem = state.tasks
+      .filter((t) => t.itemSlug === item.slug && (t.status as string) !== "done")
+      .sort((a, b) => (a.priority ?? "").localeCompare(b.priority ?? "", undefined, { numeric: true }));
     for (const task of tasksForItem) {
       if (!task.source) continue;
       const content = await this.core.getTaskContent(task.source);
@@ -209,6 +212,7 @@ export class Worker {
         tid === taskId ||
         t.slug === taskId ||
         t.source === taskId ||
+        `${t.itemSlug}/${t.priority}` === taskId ||
         t.name.toLowerCase() === taskId.toLowerCase()
       );
     });

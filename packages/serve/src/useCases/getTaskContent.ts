@@ -1,30 +1,26 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import type { AppContext } from "../context.js";
 
-interface Params {
-  encodedSource?: string;
-}
-
 /**
- * GET /api/tasks/:encodedSource/content
+ * GET /api/tasks/:taskId/content
+ * taskId is URL-encoded so path stays one segment (e.g. work%2F002-item%2F001-task.md).
  * Returns the full file content of the task (METADATA + DESCRIPTION + ACCEPTANCE CRITERIA).
  */
 export async function getTaskContent(
   ctx: AppContext,
-  request: FastifyRequest<{ Params: Params }>,
+  request: FastifyRequest<{ Params: { taskId: string } }>,
   reply: FastifyReply,
 ): Promise<void> {
-  const taskSource = request.params.encodedSource
-    ? decodeURIComponent(request.params.encodedSource)
-    : "";
+  const raw = request.params.taskId ?? "";
+  const taskId = raw ? decodeURIComponent(raw) : "";
 
-  if (!taskSource) {
-    await reply.code(400).type("application/json").send({ error: "Missing task source" });
+  if (!taskId) {
+    await reply.code(400).type("application/json").send({ error: "Missing task id" });
     return;
   }
 
   try {
-    const { content } = await ctx.backlogmd.getTaskFileContent(taskSource);
+    const { content } = await ctx.backlogmd.getTaskFileContent(taskId);
     await reply.type("application/json").send({ content });
   } catch (err) {
     const message = (err as Error).message;

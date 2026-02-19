@@ -197,8 +197,7 @@ export interface TaskDto {
     priority: string;
     slug: string;
     itemSlug: string;
-    /** Source file path relative to root; use for API taskId in PATCH/DELETE. */
-    source?: string;
+    /** Identify a task via taskId = `${itemSlug}/${priority}` for API calls. */
     dependsOn: string[];
     description: string;
     acceptanceCriteria: AcceptanceCriterion[];

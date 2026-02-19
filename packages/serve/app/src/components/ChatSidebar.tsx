@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 export interface ChatMessage {
   id: string;
@@ -8,7 +8,11 @@ export interface ChatMessage {
 
 const CHAT_API = "/api/chat";
 
-export function ChatSidebar() {
+export interface ChatSidebarProps {
+  onCollapse?: () => void;
+}
+
+export const ChatSidebar: React.FC<ChatSidebarProps> = ({ onCollapse }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -80,8 +84,18 @@ export function ChatSidebar() {
       className="flex flex-col h-full w-80 shrink-0 border-r border-slate-200 bg-white"
       data-testid="chat-sidebar"
     >
-      <div className="shrink-0 px-4 py-3 border-b border-slate-200">
+      <div className="shrink-0 px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-800">Chat</h2>
+        {onCollapse && (
+          <button
+            type="button"
+            onClick={onCollapse}
+            className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            aria-label="Collapse chat"
+          >
+            <span aria-hidden>▸</span>
+          </button>
+        )}
       </div>
 
       <div
@@ -152,4 +166,4 @@ export function ChatSidebar() {
       </div>
     </aside>
   );
-}
+};

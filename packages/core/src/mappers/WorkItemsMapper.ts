@@ -22,8 +22,8 @@ export function fromBacklogToDtos(backlog: BacklogmdDocument): WorkItemDto[] {
     return backlog.work.map((workItem) => {
         const tasks = backlog.tasks.filter((t) => t.itemSlug === workItem.slug);
         const taskDtos: TaskDto[] = tasks.map((task): TaskDto => {
-            const { source, ...rest } = task;
-            return { ...rest, source };
+            const { source: _source, ...rest } = task;
+            return rest as TaskDto;
         });
         return {
             slug: workItem.slug,

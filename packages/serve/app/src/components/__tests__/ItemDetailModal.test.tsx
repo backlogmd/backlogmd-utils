@@ -18,7 +18,6 @@ function makeItem(overrides: Record<string, unknown> = {}) {
         dependsOn: ["001-setup-project"],
         description: "",
         acceptanceCriteria: [],
-        source: "work/001-feat-my-feature/002-add-login.md",
       },
       {
         name: "Setup project",
@@ -29,7 +28,6 @@ function makeItem(overrides: Record<string, unknown> = {}) {
         dependsOn: [],
         description: "",
         acceptanceCriteria: [],
-        source: "work/001-feat-my-feature/001-setup-project.md",
       },
     ],
     ...overrides,

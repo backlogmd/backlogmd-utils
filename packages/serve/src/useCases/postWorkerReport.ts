@@ -14,14 +14,14 @@ async function updateBacklogInProgress(ctx: AppContext, body: WorkerReportBody):
 
   try {
     const doc = ctx.backlogmd.getDocument();
-    let taskSource: string | undefined;
+    let resolvedTaskId: string | undefined;
     if (taskId) {
       for (const item of doc.work) {
         const task = item.tasks.find(
-          (t) => t.source === taskId || t.slug === taskId,
+          (t) => `${t.itemSlug}/${t.priority}` === taskId || t.slug === taskId,
         );
         if (task) {
-          taskSource = task.source ?? `${task.itemSlug}/${task.slug}`;
+          resolvedTaskId = `${task.itemSlug}/${task.priority}`;
           break;
         }
       }
@@ -30,13 +30,13 @@ async function updateBacklogInProgress(ctx: AppContext, body: WorkerReportBody):
         if (item.slug !== itemId && !item.slug.startsWith(itemId + "-")) continue;
         const task = item.tasks.find((t) => t.status !== "done");
         if (task) {
-          taskSource = task.source ?? `${task.itemSlug}/${task.slug}`;
+          resolvedTaskId = `${task.itemSlug}/${task.priority}`;
           break;
         }
       }
     }
-    if (taskSource) {
-      await ctx.backlogmd.updateTaskStatus(taskSource, "in-progress");
+    if (resolvedTaskId) {
+      await ctx.backlogmd.updateTaskStatus(resolvedTaskId, "in-progress");
       ctx.notifyClients();
       return true;
     }
@@ -68,6 +68,8 @@ export async function postWorkerReport(
     }
   } else if (body.status === "idle") {
     ctx.setClaimedItem(key, null);
+    // Worker finished (or went idle); backlog may have task status updates (done). Notify clients so dashboard refetches.
+    ctx.notifyClients();
   }
 
   const state = ctx.reportWorker(body);

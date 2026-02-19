@@ -7,8 +7,6 @@ export interface AssignmentMessage {
   workerId: string;
   taskId?: string;
   itemId?: string;
-  worktreePath?: string;
-  branch?: string;
 }
 
 export class AssignmentQueue {

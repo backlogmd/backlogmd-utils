@@ -2,11 +2,11 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import type { AppContext } from "../context.js";
 
 interface Params {
-  encodedSource?: string;
+  taskId?: string;
 }
 
 /**
- * DELETE /api/tasks/:encodedSource
+ * DELETE /api/tasks/:taskId
  * Removes the task file (and its feedback file if present) from the backlog.
  */
 export async function deleteTask(
@@ -14,17 +14,16 @@ export async function deleteTask(
   request: FastifyRequest<{ Params: Params }>,
   reply: FastifyReply,
 ): Promise<void> {
-  const taskSource = request.params.encodedSource
-    ? decodeURIComponent(request.params.encodedSource)
-    : "";
+  const raw = request.params.taskId ?? "";
+  const taskId = raw ? decodeURIComponent(raw) : "";
 
-  if (!taskSource) {
-    await reply.code(400).type("application/json").send({ error: "Missing task source" });
+  if (!taskId) {
+    await reply.code(400).type("application/json").send({ error: "Missing task id" });
     return;
   }
 
   try {
-    await ctx.backlogmd.removeTask(taskSource);
+    await ctx.backlogmd.removeTask(taskId);
     ctx.notifyClients();
     await reply.code(200).type("application/json").send({ ok: true });
   } catch (err) {

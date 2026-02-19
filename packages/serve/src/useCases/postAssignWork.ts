@@ -1,24 +1,10 @@
-import path from "node:path";
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { GitProvider } from "@backlogmd/vcs";
 import type { AppContext } from "../context.js";
 
 export interface AssignWorkBody {
   workerId?: string;
   taskId?: string;
   itemId?: string;
-}
-
-function sanitizeForPath(s: string): string {
-  return s.replace(/[^a-z0-9-]/gi, "-").replace(/-+/g, "-").slice(0, 64);
-}
-
-function resolveGitRoot(backlogDir: string): string {
-  const normalized = path.normalize(backlogDir);
-  if (normalized.endsWith(".backlogmd") || normalized.includes(path.sep + ".backlogmd")) {
-    return path.dirname(backlogDir);
-  }
-  return backlogDir;
 }
 
 export async function postAssignWork(
@@ -42,53 +28,6 @@ export async function postAssignWork(
       error: "Provide at least one of taskId or itemId",
     });
     return;
-  }
-
-  const gitRoot = resolveGitRoot(ctx.backlogDir);
-  const worktreesBase = `${gitRoot}-worktrees`;
-  const slug = taskId ?? itemId ?? "work";
-  const createBranch = `assign/${sanitizeForPath(workerId)}/${sanitizeForPath(slug)}`;
-  const worktreePath = path.join(
-    worktreesBase,
-    `assign-${sanitizeForPath(workerId)}-${Date.now()}`,
-  );
-
-  const git = new GitProvider(gitRoot);
-  let isRepo = await git.isRepo();
-  if (!isRepo) {
-    const initResult = await GitProvider.init(gitRoot);
-    if (!initResult.success) {
-      await reply.code(500).type("application/json").send({
-        error: initResult.error ?? "Failed to initialize git repository",
-      });
-      return;
-    }
-    await git.stageAll();
-    const commitResult = await git.commit("initial");
-    if (!commitResult.success) {
-      await reply.code(500).type("application/json").send({
-        error: commitResult.error ?? "Initial commit failed; ensure the project has at least one file",
-      });
-      return;
-    }
-  }
-
-  let worktreePathToUse: string;
-  const worktrees = await git.listWorktrees();
-  const existingWorktree = worktrees.find((w) => w.branch === createBranch);
-  if (existingWorktree) {
-    worktreePathToUse = existingWorktree.path;
-  } else {
-    const worktreeResult = await git.createWorktree(worktreePath, {
-      createBranch,
-    });
-    if (!worktreeResult.success) {
-      await reply.code(500).type("application/json").send({
-        error: worktreeResult.error ?? "Failed to create worktree",
-      });
-      return;
-    }
-    worktreePathToUse = worktreePath;
   }
 
   try {
@@ -116,8 +55,6 @@ export async function postAssignWork(
     workerId,
     taskId,
     itemId,
-    worktreePath: worktreePathToUse,
-    branch: createBranch,
   });
   ctx.notifyClients();
   ctx.triggerWorkAvailable();

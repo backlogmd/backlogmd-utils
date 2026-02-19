@@ -316,7 +316,7 @@ describe("POST /api/workers/assign", () => {
     expect(json).toEqual({ ok: true });
   });
 
-  it("returns 200 with ok JSON for empty body", async () => {
+  it("returns 400 when body is missing workerId", async () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     const res = await request(
@@ -325,9 +325,9 @@ describe("POST /api/workers/assign", () => {
       "{}",
     );
 
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json).toEqual({ ok: true });
+    expect(json.error).toContain("Missing");
   });
 
   it("returns 200 with ok JSON when assigning by itemId", async () => {

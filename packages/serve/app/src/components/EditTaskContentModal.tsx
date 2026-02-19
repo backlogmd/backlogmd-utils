@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 
 export function EditTaskContentModal({
-  taskSource,
+  taskId,
   taskName,
   onClose,
   onSaved,
 }: {
-  taskSource: string;
+  taskId: string;
   taskName?: string;
   onClose: () => void;
   onSaved?: () => void;
@@ -18,7 +18,7 @@ export function EditTaskContentModal({
 
   useEffect(() => {
     setError(null);
-    const encoded = encodeURIComponent(taskSource);
+    const encoded = encodeURIComponent(taskId);
     fetch(`/api/tasks/${encoded}/content`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load content");
@@ -27,7 +27,7 @@ export function EditTaskContentModal({
       .then((data: { content?: string }) => setContent(data.content ?? ""))
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [taskSource]);
+  }, [taskId]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -40,7 +40,7 @@ export function EditTaskContentModal({
   const handleSave = () => {
     setSaving(true);
     setError(null);
-    const encoded = encodeURIComponent(taskSource);
+    const encoded = encodeURIComponent(taskId);
     fetch(`/api/tasks/${encoded}/content`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

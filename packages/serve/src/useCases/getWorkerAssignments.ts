@@ -5,9 +5,9 @@ import type { AppContext } from "../context.js";
  * Returns the list of available work (assignments) for the requesting worker
  * by reading the backlog. Assignee is stored in the backlog document, so
  * after a server reload the list is still correct.
- * Query: name (required). role is optional; each worker knows its role.
- * Match: assignee === name or assignee starts with "name:".
- * Response: 200 with { assignments: { taskId?: string; itemId?: string }[] }.
+ * Query: name (optional). If omitted, returns all assignments with assignee set (for debug).
+ * Match when name given: assignee === name or assignee starts with "name:".
+ * Response: 200 with { assignments: { taskId?: string; itemId?: string; assignee?: string }[] }.
  */
 export async function getWorkerAssignments(
   ctx: AppContext,
@@ -17,15 +17,11 @@ export async function getWorkerAssignments(
   reply: FastifyReply,
 ): Promise<void> {
   const name = typeof request.query?.name === "string" ? request.query.name.trim() : "";
-  if (!name) {
-    await reply.code(400).type("application/json").send({
-      error: "Missing name query",
-    });
-    return;
-  }
+  const allWorkers = !name;
 
   function assigneeMatches(assignee: string | undefined): boolean {
     if (!assignee) return false;
+    if (allWorkers) return true;
     return assignee === name || assignee.startsWith(name + ":");
   }
 
@@ -40,12 +36,14 @@ export async function getWorkerAssignments(
     return;
   }
 
-  const assignments: { taskId?: string; itemId?: string }[] = [];
+  const assignments: { taskId?: string; itemId?: string; assignee?: string }[] = [];
   const debug = process.env.BACKLOGMD_DEBUG_ASSIGNMENTS === "1";
 
   if (debug) {
     const totalTasks = doc.work.reduce((n, w) => n + w.tasks.length, 0);
-    console.log(`[assignments] name=${name} backlogDir=${ctx.backlogDir} work=${doc.work.length} tasks=${totalTasks}`);
+    console.log(
+      `[assignments] name=${name || "(all)"} backlogDir=${ctx.backlogDir} work=${doc.work.length} tasks=${totalTasks}`,
+    );
     for (const w of doc.work) {
       const taskAssignees = w.tasks.map((t) => t.assignee).filter(Boolean);
       const match = taskAssignees.some((a) => assigneeMatches(a));
@@ -62,8 +60,12 @@ export async function getWorkerAssignments(
         task.status !== "done" &&
         task.status !== "in-progress"
       ) {
-        const taskId = task.source ?? `${task.itemSlug}/${task.slug}`;
-        assignments.push({ taskId, itemId: task.itemSlug });
+        const taskId = `${task.itemSlug}/${task.priority}`;
+        assignments.push(
+          allWorkers && task.assignee
+            ? { taskId, itemId: task.itemSlug, assignee: task.assignee }
+            : { taskId, itemId: task.itemSlug },
+        );
       }
     }
   }
@@ -71,7 +73,7 @@ export async function getWorkerAssignments(
     const itemAssignedToWorker =
       assigneeMatches(item.assignee) || item.tasks.some((t) => assigneeMatches(t.assignee));
     if (!itemAssignedToWorker || item.status === "done") continue;
-    if (ctx.isItemClaimed(item.slug)) {
+    if (!allWorkers && ctx.isItemClaimed(item.slug)) {
       if (debug) console.log(`[assignments] skip ${item.slug}: claimed`);
       continue;
     }
@@ -90,7 +92,11 @@ export async function getWorkerAssignments(
       (a) => a.itemId === item.slug && a.taskId != null,
     );
     if (!alreadyHasTaskForItem) {
-      assignments.push({ itemId: item.slug });
+      const assignee =
+        allWorkers && (item.assignee || item.tasks.find((t) => t.assignee)?.assignee);
+      assignments.push(
+        assignee != null ? { itemId: item.slug, assignee } : { itemId: item.slug },
+      );
       if (debug) console.log(`[assignments] add itemId=${item.slug}`);
     }
   }

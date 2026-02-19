@@ -24,21 +24,21 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get("/api/backlog.json", (req, reply) => getBacklog(ctx, req, reply));
 
   app.patch<{
-    Params: { encodedSource: string };
+    Params: { taskId: string };
     Body: { status?: string };
-  }>("/api/tasks/:encodedSource", (req, reply) =>
+  }>("/api/tasks/:taskId", (req, reply) =>
     patchTaskStatus(ctx, req as never, reply),
   );
-  app.get<{ Params: { encodedSource: string } }>(
-    "/api/tasks/:encodedSource/content",
+  app.get<{ Params: { taskId: string } }>(
+    "/api/tasks/:taskId/content",
     (req, reply) => getTaskContent(ctx, req as never, reply),
   );
-  app.put<{ Params: { encodedSource: string }; Body: { content?: string } }>(
-    "/api/tasks/:encodedSource/content",
+  app.put<{ Params: { taskId: string }; Body: { content?: string } }>(
+    "/api/tasks/:taskId/content",
     (req, reply) => putTaskContent(ctx, req as never, reply),
   );
-  app.delete<{ Params: { encodedSource: string } }>(
-    "/api/tasks/:encodedSource",
+  app.delete<{ Params: { taskId: string } }>(
+    "/api/tasks/:taskId",
     (req, reply) => deleteTask(ctx, req as never, reply),
   );
 

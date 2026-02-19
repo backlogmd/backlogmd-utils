@@ -146,23 +146,33 @@ export class Backlogmd {
     }
 
     /** Get the full file content of a task (METADATA + DESCRIPTION + ACCEPTANCE CRITERIA). */
-    async getTaskFileContent(taskSource: string): Promise<{ content: string }> {
+    async getTaskFileContent(taskId: string): Promise<{ content: string }> {
         const task = this.state.tasks.find(
-            (t) => t.source === taskSource || t.source === taskSource.replace(/\.md$/, ""),
+            (t) =>
+                t.source === taskId ||
+                t.source === taskId.replace(/\.md$/, "") ||
+                t.slug === taskId ||
+                `${t.itemSlug}/${t.priority}` === taskId ||
+                `${t.itemSlug}/${t.slug.split("-")[0]}` === taskId,
         );
-        if (!task) throw new Error(`Task "${taskSource}" not found`);
-        const absPath = path.join(this.rootDir, task.source ?? taskSource);
+        if (!task?.source) throw new Error(`Task "${taskId}" not found`);
+        const absPath = path.join(this.rootDir, task.source);
         const content = fs.readFileSync(absPath, "utf-8");
         return { content };
     }
 
     /** Overwrite the task file (full content); then re-parses and returns fresh state. */
-    async updateTaskFileContent(taskSource: string, content: string): Promise<BacklogStateDto> {
+    async updateTaskFileContent(taskId: string, content: string): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             const task = this.state.tasks.find(
-                (t) => t.source === taskSource || t.source === taskSource.replace(/\.md$/, ""),
+                (t) =>
+                    t.source === taskId ||
+                    t.source === taskId.replace(/\.md$/, "") ||
+                    t.slug === taskId ||
+                    `${t.itemSlug}/${t.priority}` === taskId ||
+                    `${t.itemSlug}/${t.slug.split("-")[0]}` === taskId,
             );
-            if (!task?.source) throw new Error(`Task "${taskSource}" not found`);
+            if (!task?.source) throw new Error(`Task "${taskId}" not found`);
             const absPath = path.join(this.rootDir, task.source);
             fs.writeFileSync(absPath, content, "utf-8");
             return this.refreshState();
@@ -178,10 +188,16 @@ export class Backlogmd {
         });
     }
 
+    /** Store only worker name (part before ':') in backlog so template shows assignee: name. */
+    private static assigneeName(agentId: string): string {
+        const i = agentId.indexOf(":");
+        return i >= 0 ? agentId.slice(0, i) : agentId;
+    }
+
     async assignAgent(taskId: string, agentId: string): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             const doc = await BacklogDocument.load(this.rootDir);
-            const changeset = doc.changeTaskAssignee(taskId, agentId);
+            const changeset = doc.changeTaskAssignee(taskId, Backlogmd.assigneeName(agentId));
             await doc.commit(changeset);
             return this.refreshState();
         });
@@ -224,11 +240,11 @@ export class Backlogmd {
         });
     }
 
-    /** Assign a work item to an agent (sets assignee in the item index). */
+    /** Assign a work item and all its tasks to an agent (item index + every task file; stores name only). */
     async assignItem(itemSlug: string, agentId: string): Promise<BacklogStateDto> {
         return this.queue.enqueue(async () => {
             const doc = await BacklogDocument.load(this.rootDir);
-            const changeset = doc.changeItemAssignee(itemSlug, agentId);
+            const changeset = doc.changeItemAndTasksAssignee(itemSlug, Backlogmd.assigneeName(agentId));
             await doc.commit(changeset);
             return this.refreshState();
         });

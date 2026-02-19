@@ -22,7 +22,7 @@ export function ItemDetailModal({
 }: {
     item: DisplayItem;
     onClose: () => void;
-    onTaskStatusChange: (taskSource: string, newStatus: string) => void;
+    onTaskStatusChange: (taskId: string, newStatus: string) => void;
     pendingTasks: Set<string>;
 }) {
     const [workers, setWorkers] = useState<WorkerState[]>([]);
@@ -31,7 +31,7 @@ export function ItemDetailModal({
     const [assigning, setAssigning] = useState(false);
     const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
   const [showEditContent, setShowEditContent] = useState(false);
-  const [editTaskSource, setEditTaskSource] = useState<string | null>(null);
+  const [editTaskId, setEditTaskId] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
@@ -231,8 +231,8 @@ export function ItemDetailModal({
                                     key={task.slug}
                                     task={task}
                                     onStatusChange={onTaskStatusChange}
-                                    onEditContent={(source) => setEditTaskSource(source)}
-                                    isPending={pendingTasks.has(task.source ?? "")}
+                                    onEditContent={(id) => setEditTaskId(id)}
+                                    isPending={pendingTasks.has(`${task.itemSlug}/${task.priority}`)}
                                 />
                             ))}
                         </div>
@@ -268,12 +268,12 @@ export function ItemDetailModal({
                     onSaved={() => setShowEditContent(false)}
                 />
             )}
-            {editTaskSource && (
+            {editTaskId && (
                 <EditTaskContentModal
-                    taskSource={editTaskSource}
-                    taskName={item.tasks.find((t) => (t.source ?? "") === editTaskSource)?.name}
-                    onClose={() => setEditTaskSource(null)}
-                    onSaved={() => setEditTaskSource(null)}
+                    taskId={editTaskId}
+                    taskName={item.tasks.find((t) => `${t.itemSlug}/${t.priority}` === editTaskId)?.name}
+                    onClose={() => setEditTaskId(null)}
+                    onSaved={() => setEditTaskId(null)}
                 />
             )}
         </div>

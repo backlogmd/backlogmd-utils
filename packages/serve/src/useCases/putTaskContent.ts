@@ -1,29 +1,24 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import type { AppContext } from "../context.js";
 
-interface Params {
-  encodedSource?: string;
-}
-
 interface Body {
   content?: string;
 }
 
 /**
- * PUT /api/tasks/:encodedSource/content
+ * PUT /api/tasks/:taskId/content
  * Overwrites the task file (full content). Reloads tree and notifies clients.
  */
 export async function putTaskContent(
   ctx: AppContext,
-  request: FastifyRequest<{ Params: Params; Body: Body }>,
+  request: FastifyRequest<{ Params: { taskId: string }; Body: Body }>,
   reply: FastifyReply,
 ): Promise<void> {
-  const taskSource = request.params.encodedSource
-    ? decodeURIComponent(request.params.encodedSource)
-    : "";
+  const raw = request.params.taskId ?? "";
+  const taskId = raw ? decodeURIComponent(raw) : "";
 
-  if (!taskSource) {
-    await reply.code(400).type("application/json").send({ error: "Missing task source" });
+  if (!taskId) {
+    await reply.code(400).type("application/json").send({ error: "Missing task id" });
     return;
   }
 
@@ -31,7 +26,7 @@ export async function putTaskContent(
   const content = typeof body?.content === "string" ? body.content : "";
 
   try {
-    await ctx.backlogmd.updateTaskFileContent(taskSource, content);
+    await ctx.backlogmd.updateTaskFileContent(taskId, content);
     ctx.notifyClients();
     ctx.triggerWorkAvailable();
     await reply.type("application/json").send({ ok: true });
