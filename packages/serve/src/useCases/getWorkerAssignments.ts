@@ -92,8 +92,9 @@ export async function getWorkerAssignments(
       (a) => a.itemId === item.slug && a.taskId != null,
     );
     if (!alreadyHasTaskForItem) {
-      const assignee =
-        allWorkers && (item.assignee || item.tasks.find((t) => t.assignee)?.assignee);
+      const assignee = allWorkers
+        ? (item.assignee || item.tasks.find((t) => t.assignee)?.assignee || undefined)
+        : undefined;
       assignments.push(
         assignee != null ? { itemId: item.slug, assignee } : { itemId: item.slug },
       );
