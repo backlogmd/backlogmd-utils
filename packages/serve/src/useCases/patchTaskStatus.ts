@@ -1,11 +1,9 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import type { TaskStatus } from "@backlogmd/types";
-import { BacklogDocument } from "@backlogmd/writer";
 import { VALID_STATUSES } from "../lib/validStatuses.js";
 import type { AppContext } from "../context.js";
 
 interface Params {
-  encodedSource?: string;
+  taskId?: string;
 }
 
 interface Body {
@@ -17,12 +15,12 @@ export async function patchTaskStatus(
   request: FastifyRequest<{ Params: Params; Body: Body }>,
   reply: FastifyReply,
 ): Promise<void> {
-  const taskSource = request.params.encodedSource
-    ? decodeURIComponent(request.params.encodedSource)
+  const taskId = request.params.taskId
+    ? decodeURIComponent(request.params.taskId)
     : "";
 
-  if (!taskSource) {
-    await reply.code(400).type("application/json").send({ error: "Missing task source" });
+  if (!taskId) {
+    await reply.code(400).type("application/json").send({ error: "Missing task id" });
     return;
   }
 
@@ -36,9 +34,7 @@ export async function patchTaskStatus(
   }
 
   try {
-    const doc = await BacklogDocument.load(ctx.backlogDir);
-    const changeset = doc.changeTaskStatus(taskSource, newStatus as TaskStatus);
-    await doc.commit(changeset);
+    await ctx.backlogmd.updateTaskStatus(taskId, newStatus as import("@backlogmd/types").TaskStatus);
     ctx.notifyClients();
     await reply.type("application/json").send({ ok: true });
   } catch (err) {

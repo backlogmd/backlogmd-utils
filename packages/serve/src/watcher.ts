@@ -1,4 +1,4 @@
-import { watch, type FSWatcher } from "node:fs";
+import { watch, type FSWatcher } from "fs";
 
 export interface WatchOptions {
   debounceMs?: number;

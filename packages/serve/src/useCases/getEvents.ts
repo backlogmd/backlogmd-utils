@@ -12,9 +12,12 @@ export async function getEvents(
     "Cache-Control": "no-cache",
     Connection: "keep-alive",
   });
-  res.write("\n");
+  (res as unknown as { write: (s: string) => void }).write("\n");
   ctx.addEventClient(res);
-  _request.raw.on("close", () => {
+  // Send initial status (e.g. worker count) on the same SSE stream
+  const status = { type: "status" as const, workers: ctx.getWorkerStates().length };
+  (res as unknown as { write: (s: string) => void }).write(`data: ${JSON.stringify(status)}\n\n`);
+  (_request.raw as unknown as { on: (event: string, fn: () => void) => void }).on("close", () => {
     ctx.removeEventClient(res);
   });
 }

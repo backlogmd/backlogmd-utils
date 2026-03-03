@@ -1,93 +1,94 @@
-import { buildBacklogOutput } from "@backlogmd/parser";
-import { createChatAgent } from "@backlogmd/autopilot";
-import { BacklogCore } from "@backlogmd/core";
-import { Worker, PLANNER_ROLE } from "@backlogmd/workers";
-import type { WorkerRole } from "@backlogmd/workers";
-import { ChatOpenAI } from "@langchain/openai";
-import { DynamicTool } from "langchain/tools";
-import type { AgentExecutor } from "langchain/agents";
+// import { buildBacklogOutput } from "@backlogmd/parser";
+// //import { createChatAgent } from "@backlogmd/autopilot";
+// import { BacklogCore } from "@backlogmd/core";
+// import { DynamicTool } from "@langchain/core/tools";
+// import { ChatOpenAI } from "@langchain/openai";
+// import type { AgentExecutor } from "@langchain/classic/agents";
+// import type { WorkerState } from "./workerRegistry.js";
 
-const STAFF_ENGINEER_ROLE: WorkerRole = {
-  id: "staff-engineer",
-};
+// export interface CreateChatAgentForServerOptions {
+//   onBacklogChange?: () => void;
+//   /** Workers that have reported to the server (in-memory list). Used for list_workers tool. */
+//   getWorkerStates?: () => WorkerState[];
+// }
 
-export interface CreateChatAgentForServerOptions {
-  onBacklogChange?: () => void;
-}
+// export async function createChatAgentForServer(
+//   backlogDir: string,
+//   options: CreateChatAgentForServerOptions = {},
+// ): Promise<AgentExecutor | null> {
+//   const { onBacklogChange, getWorkerStates } = options;
+//   if (!process.env.OPENAI_API_KEY) {
+//     return null;
+//   }
 
-export async function createChatAgentForServer(
-  backlogDir: string,
-  options: CreateChatAgentForServerOptions = {},
-): Promise<AgentExecutor | null> {
-  const { onBacklogChange } = options;
-  if (!process.env.OPENAI_API_KEY) {
-    return null;
-  }
+//   const getBacklog = new DynamicTool({
+//     name: "get_backlog",
+//     description:
+//       "Get the current backlog (work items and tasks). Use this to answer questions about what is on the backlog.",
+//     func: async () => {
+//       const output = buildBacklogOutput(backlogDir);
+//       return JSON.stringify(
+//         {
+//           entries: output.entries?.length ?? 0,
+//           items: output.items?.length ?? 0,
+//           tasks: output.tasks?.length ?? 0,
+//           validationErrors: output.validation?.errors?.length ?? 0,
+//           summary: output.entries?.slice(0, 20) ?? [],
+//         },
+//         null,
+//         2,
+//       );
+//     },
+//   });
 
-  const getBacklog = new DynamicTool({
-    name: "get_backlog",
-    description:
-      "Get the current backlog (work items and tasks). Use this to answer questions about what is on the backlog.",
-    func: async () => {
-      const output = buildBacklogOutput(backlogDir);
-      return JSON.stringify(
-        {
-          entries: output.entries?.length ?? 0,
-          items: output.items?.length ?? 0,
-          tasks: output.tasks?.length ?? 0,
-          validationErrors: output.validation?.errors?.length ?? 0,
-          summary: output.entries?.slice(0, 20) ?? [],
-        },
-        null,
-        2,
-      );
-    },
-  });
+//   const tools: InstanceType<typeof DynamicTool>[] = [getBacklog];
 
-  let workersList: { worker: Worker; name: string; role: string }[] = [];
-  let core: Awaited<ReturnType<typeof BacklogCore.load>> | null = null;
-  try {
-    core = await BacklogCore.load({ rootDir: backlogDir });
-    workersList = [
-      {
-        worker: new Worker(core, undefined, undefined, undefined, STAFF_ENGINEER_ROLE),
-        name: "Camaron",
-        role: "staff-engineer",
-      },
-      {
-        worker: new Worker(core, undefined, undefined, undefined, STAFF_ENGINEER_ROLE),
-        name: "Pastora",
-        role: "staff-engineer",
-      },
-      {
-        worker: new Worker(core, undefined, undefined, undefined, PLANNER_ROLE),
-        name: "Planner",
-        role: "planner",
-      },
-    ];
-  } catch (err) {
-    console.warn(
-      "[backlogmd-serve] Could not load core for workers:",
-      (err as Error).message,
-      "- chat will have no list_workers.",
-    );
-  }
+//   if (getWorkerStates) {
+//     tools.push(
+//       new DynamicTool({
+//         name: "list_workers",
+//         description:
+//           "List workers that have reported to the server (name, role, status). Call this when the user asks for help, who is available, or what workers exist.",
+//         func: async () => {
+//           const workers = getWorkerStates();
+//           if (workers.length === 0) {
+//             return "No workers have reported yet. Workers register when they run with --server-url pointing to this server.";
+//           }
+//           return workers
+//             .map(
+//               (w) => `${w.name} (${w.role}): ${w.status}${w.taskTitle ? ` — ${w.taskTitle}` : ""}`,
+//             )
+//             .join("\n");
+//         },
+//       }),
+//     );
+//   }
 
-  try {
-    const executor = await createChatAgent({
-      llm: new ChatOpenAI({ temperature: 0 }),
-      core: core ?? undefined,
-      workers: workersList.length > 0 ? workersList : undefined,
-      tools: [getBacklog],
-      onBacklogChange,
-    });
-    console.log("[backlogmd-serve] Chat agent ready.");
-    return executor;
-  } catch (err) {
-    console.error(
-      "[backlogmd-serve] Failed to create chat agent:",
-      (err as Error).message,
-    );
-    return null;
-  }
-}
+//   let core: Awaited<ReturnType<typeof BacklogCore.load>> | null = null;
+//   try {
+//     core = await BacklogCore.load({ rootDir: backlogDir });
+//   } catch (err) {
+//     console.warn(
+//       "[backlogmd-serve] Could not load core:",
+//       (err as Error).message,
+//       "- chat will have no backlog mutation tools.",
+//     );
+//   }
+
+// try {
+//   const executor = await createChatAgent({
+//     llm: new ChatOpenAI({ temperature: 0 }),
+//     core: core ?? undefined,
+//     tools,
+//     onBacklogChange,
+//   });
+//   console.log("[backlogmd-serve] Chat agent ready.");
+//   return executor;
+// } catch (err) {
+//   console.error(
+//     "[backlogmd-serve] Failed to create chat agent:",
+//     (err as Error).message,
+//   );
+//   return null;
+// }
+//}

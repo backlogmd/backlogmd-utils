@@ -9,7 +9,6 @@ function makeTask(overrides: Record<string, unknown> = {}) {
     priority: "001",
     slug: "001-setup-project",
     itemSlug: "001-feat-my-feature",
-    source: "work/001-feat-my-feature/001-setup-project.md",
     ...overrides,
   };
 }
@@ -76,11 +75,11 @@ describe("TaskRow", () => {
     expect(checkmark).not.toBeNull();
   });
 
-  it("calls onStatusChange with correct args on click", () => {
+  it("calls onStatusChange with taskId (itemSlug/priority) on click", () => {
     const onChange = vi.fn();
     const { container } = render(
       <TaskRow
-        task={makeTask({ source: "work/feat/001-task.md" })}
+        task={makeTask({ itemSlug: "work/feat", priority: "001-task" })}
         onStatusChange={onChange}
         isPending={false}
       />,
@@ -89,7 +88,7 @@ describe("TaskRow", () => {
     const btn = container.querySelector("button")!;
     fireEvent.click(btn);
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange).toHaveBeenCalledWith("work/feat/001-task.md", "done");
+    expect(onChange).toHaveBeenCalledWith("work/feat/001-task", "done");
   });
 
   it('shows "Saving..." and disables button when isPending is true', () => {

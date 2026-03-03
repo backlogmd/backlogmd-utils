@@ -6,8 +6,17 @@ import {
 } from "@backlogmd/types";
 import { buildBacklogOutput } from "@backlogmd/parser";
 import type { Changeset, FileCache, FilePatch } from "./types.js";
-import { patchMetadataField, patchItemIndexMetadataField } from "./patch.js";
+import {
+  patchMetadataField,
+  patchOrAddTaskMetadataField,
+  patchItemIndexMetadataField,
+} from "./patch.js";
 import { applyChangeset } from "./apply.js";
+
+/** Deep clone for BacklogOutput (JSON-serializable; no DOM). */
+function deepClone<T>(x: T): T {
+  return JSON.parse(JSON.stringify(x));
+}
 
 /**
  * BacklogDocument — a virtual DOM for the .backlogmd/ directory.
@@ -118,13 +127,13 @@ export class BacklogDocument {
       // Return an empty changeset — nothing to do
       return {
         patches: [],
-        modelBefore: structuredClone(this._model),
-        modelAfter: structuredClone(this._model),
+        modelBefore: deepClone(this._model),
+        modelAfter: deepClone(this._model),
       };
     }
 
     const patches: FilePatch[] = [];
-    const modelAfter: BacklogOutput = structuredClone(this._model);
+    const modelAfter: BacklogOutput = deepClone(this._model);
 
     // --- 1. Patch the task file ---
     const taskFileContent = this._cache.get(task.source);
@@ -154,7 +163,7 @@ export class BacklogDocument {
 
     return {
       patches,
-      modelBefore: structuredClone(this._model),
+      modelBefore: deepClone(this._model),
       modelAfter,
     };
   }
@@ -171,17 +180,8 @@ export class BacklogDocument {
     if (!task) throw new Error(`Task "${taskId}" not found in the model`);
     const taskFileContent = this._cache.get(task.source);
     if (!taskFileContent) throw new Error(`Task file "${task.source}" not found in cache`);
-    let taskPatch: { patched: string; original: string; replacement: string };
-    try {
-      taskPatch = patchMetadataField(taskFileContent, "assignee", assignee);
-    } catch {
-      return {
-        patches: [],
-        modelBefore: structuredClone(this._model),
-        modelAfter: structuredClone(this._model),
-      };
-    }
-    const modelAfter: BacklogOutput = structuredClone(this._model);
+    const taskPatch = patchOrAddTaskMetadataField(taskFileContent, "assignee", assignee);
+    const modelAfter: BacklogOutput = deepClone(this._model);
     const modelTask = modelAfter.tasks.find((t) => t.source === task.source)!;
     modelTask.assignee = assignee;
     return {
@@ -193,7 +193,7 @@ export class BacklogDocument {
           description: `task assignee → ${assignee}`,
         },
       ],
-      modelBefore: structuredClone(this._model),
+      modelBefore: deepClone(this._model),
       modelAfter,
     };
   }
@@ -214,7 +214,7 @@ export class BacklogDocument {
       throw new Error(`Failed to patch item assignee: ${(e as Error).message}`);
     }
 
-    const modelAfter: BacklogOutput = structuredClone(this._model);
+    const modelAfter: BacklogOutput = deepClone(this._model);
     const modelItem = modelAfter.items.find((i) => i.slug === itemSlug)!;
     modelItem.assignee = assignee;
 
@@ -227,7 +227,62 @@ export class BacklogDocument {
           description: `item assignee → ${assignee}`,
         },
       ],
-      modelBefore: structuredClone(this._model),
+      modelBefore: deepClone(this._model),
+      modelAfter,
+    };
+  }
+
+  /**
+   * Change a work item's assignee and all its tasks' assignees (SPEC v4).
+   * Returns a single Changeset; call commit() to write. Use this when assigning
+   * a work item from the UI so the item and every task under it get the same assignee.
+   */
+  changeItemAndTasksAssignee(itemSlug: string, assignee: string): Changeset {
+    const item = this._model.items.find((i) => i.slug === itemSlug);
+    if (!item) throw new Error(`Item "${itemSlug}" not found in the model`);
+    const indexContent = this._cache.get(item.source);
+    if (!indexContent) throw new Error(`Item index "${item.source}" not found in cache`);
+
+    let itemPatch: { patched: string; original: string; replacement: string };
+    try {
+      itemPatch = patchItemIndexMetadataField(indexContent, "assignee", assignee);
+    } catch (e) {
+      throw new Error(`Failed to patch item assignee: ${(e as Error).message}`);
+    }
+
+    const patches: FilePatch[] = [
+      {
+        filePath: item.source,
+        original: itemPatch.original,
+        replacement: itemPatch.replacement,
+        description: `item assignee → ${assignee}`,
+      },
+    ];
+
+    const itemTasks = this._model.tasks.filter((t) => t.itemSlug === itemSlug);
+    for (const task of itemTasks) {
+      const taskFileContent = this._cache.get(task.source);
+      if (!taskFileContent) throw new Error(`Task file "${task.source}" not found in cache`);
+      const taskPatch = patchOrAddTaskMetadataField(taskFileContent, "assignee", assignee);
+      patches.push({
+        filePath: task.source,
+        original: taskPatch.original,
+        replacement: taskPatch.replacement,
+        description: `task assignee → ${assignee}`,
+      });
+    }
+
+    const modelAfter: BacklogOutput = deepClone(this._model);
+    const modelItem = modelAfter.items.find((i) => i.slug === itemSlug)!;
+    modelItem.assignee = assignee;
+    for (const task of itemTasks) {
+      const modelTask = modelAfter.tasks.find((t) => t.source === task.source);
+      if (modelTask) modelTask.assignee = assignee;
+    }
+
+    return {
+      patches,
+      modelBefore: deepClone(this._model),
       modelAfter,
     };
   }

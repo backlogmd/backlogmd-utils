@@ -1,60 +1,105 @@
 #!/usr/bin/env node
 
 import path from "node:path";
-import { BacklogCore } from "@backlogmd/core";
-import { Worker } from "./workerRunner.js";
-import { OpenCodeAgent } from "./agents/opencode.js";
-import { GitProvider } from "@backlogmd/vcs";
+import { runWorkerLoop } from "./runLoop.js";
+import { PLANNER_ROLE } from "./constants.js";
+import type { WorkerRole } from "./types.js";
 
-async function main() {
-  const args = process.argv.slice(2);
+const VALID_ROLES = ["planner", "executor"] as const;
+const ROLE_MAP: Record<(typeof VALID_ROLES)[number], WorkerRole> = {
+    planner: PLANNER_ROLE,
+    executor: { id: "executor", name: "Executor" },
+};
 
-  if (args.length === 0) {
-    console.error("Usage: worker <backlog-dir> [task-id] [options]");
-    console.error("  backlog-dir: Path to .backlogmd/ directory");
-    console.error("  task-id: Optional. Execute a specific task by ID instead of all plan tasks");
-    console.error("  --auto-commit: Automatically commit changes after task completion");
-    console.error("  --auto-push: Automatically push after commit");
-    process.exit(1);
-  }
+const USAGE = `Usage: backlogmd-workers <backlog-dir> [taskId] [options]
 
-  const rootDir = path.resolve(args[0]);
-  const taskId = args[1];
+  backlog-dir    Path to .backlogmd directory or project root
+  taskId         Optional: run this task once and exit
 
-  let autoCommit = false;
-  let autoPush = false;
+Options:
+  --server-url <url>   Server URL (e.g. http://localhost:3030)
+  --name <name>        Worker name (default: dev-<timestamp>)
+  --role <role>        Role: ${VALID_ROLES.join(" | ")} (default: planner)
+  --interval <secs>   Poll interval in seconds (default: 30)
+  --dry               Dry run: run agent but do not write to backlog or VCS (happy-path test)
+  --agent <name>      Agent: opencode | emulator (default: opencode). Use emulator + --dry to test worker loop.
+  --help               Show this help`;
 
-  for (const arg of args) {
-    if (arg === "--auto-commit") autoCommit = true;
-    if (arg === "--auto-push") autoPush = true;
-  }
+function parseArgs(argv: string[]): {
+    backlogDir: string;
+    taskId?: string;
+    serverUrl?: string;
+    name?: string;
+    role?: WorkerRole;
+    interval?: number;
+    dry?: boolean;
+    agent?: "opencode" | "emulator";
+} {
+    const args = argv.slice(2);
+    if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
+        console.log(USAGE);
+        process.exit(args.includes("--help") || args.includes("-h") ? 0 : 1);
+    }
 
-  console.log(`[worker] Loading backlog from: ${rootDir}`);
+    const backlogDir = path.resolve(args[0]);
+    let taskId: string | undefined;
+    let serverUrl: string | undefined;
+    let name: string | undefined;
+    let role: WorkerRole | undefined;
+    let interval: number | undefined;
+    let dry = false;
+    let agent: "opencode" | "emulator" | undefined;
 
-  const core = await BacklogCore.load({ rootDir, autoReconcile: false });
-  const agent = new OpenCodeAgent();
+    for (let i = 1; i < args.length; i++) {
+        if (args[i] === "--server-url" && i + 1 < args.length) {
+            serverUrl = args[++i];
+        } else if (args[i] === "--name" && i + 1 < args.length) {
+            name = args[++i];
+        } else if (args[i] === "--dry") {
+            dry = true;
+        } else if (args[i] === "--agent" && i + 1 < args.length) {
+            const a = args[++i].toLowerCase();
+            if (a === "opencode" || a === "emulator") agent = a;
+        } else if (args[i] === "--role" && i + 1 < args.length) {
+            const roleArg = args[++i];
+            const r = roleArg.toLowerCase();
+            if (VALID_ROLES.includes(r as (typeof VALID_ROLES)[number])) {
+                role = ROLE_MAP[r as (typeof VALID_ROLES)[number]];
+            } else {
+                console.error(
+                    `Error: invalid role "${roleArg}". Must be one of: ${VALID_ROLES.join(", ")}`,
+                );
+                console.error(USAGE);
+                process.exit(1);
+            }
+        } else if (args[i] === "--interval" && i + 1 < args.length) {
+            interval = parseInt(args[++i], 10) || 30;
+        } else if (!args[i].startsWith("--") && !taskId) {
+            taskId = args[i];
+        }
+    }
 
-  let vcs;
-  if (autoCommit || autoPush) {
-    vcs = new GitProvider(rootDir);
-  }
+    return { backlogDir, taskId, serverUrl, name, role, interval, dry, agent };
+}
 
-  const worker = new Worker(core, agent, vcs, {
-    autoCommit,
-    autoPush,
-    commitMessageTemplate: "feat: {task}",
-  });
+async function main(): Promise<void> {
+    const opts = parseArgs(process.argv);
+    const pollIntervalMs =
+        opts.interval != null && opts.interval > 0 ? opts.interval * 1000 : 30_000;
 
-  if (taskId && !taskId.startsWith("--")) {
-    console.log(`[worker] Executing task: ${taskId}`);
-    await worker.runTaskById(taskId);
-  } else {
-    console.log("[worker] Running all plan tasks");
-    await worker.run();
-  }
+    await runWorkerLoop({
+        backlogDir: opts.backlogDir,
+        taskId: opts.taskId,
+        serverUrl: opts.serverUrl,
+        name: opts.name,
+        role: opts.role,
+        pollIntervalMs,
+        dry: opts.dry,
+        agent: opts.agent,
+    });
 }
 
 main().catch((err) => {
-  console.error("[worker] Error:", err);
-  process.exit(1);
+    console.error(err);
+    process.exit(1);
 });

@@ -1,33 +1,40 @@
-import type { BacklogOutput, Task } from "@backlogmd/types";
-import { BacklogCore } from "@backlogmd/core";
-import type { CodeAgent, AgentTask, WorkerRole } from "./types.js";
+import type { BacklogOutput } from "@backlogmd/types";
+import type { BacklogCore } from "@backlogmd/core";
+import type { AgentTask, WorkerRole, CodeAgent } from "./types.js";
+import type { WorkerReporter } from "./reporter.js";
 import { OpenCodeAgent } from "./agents/opencode.js";
 import type { VCSProvider, VCSOptions } from "@backlogmd/vcs";
-import fs from "node:fs/promises";
-import path from "node:path";
+import fs from "fs/promises";
+import path from "path";
 
 export class Worker {
-  private core: BacklogCore;
-  private agent: CodeAgent;
-  private vcs?: VCSProvider;
-  private vcsOptions?: VCSOptions;
-  private role?: WorkerRole;
+    private core: BacklogCore;
+    private agent: CodeAgent;
+    private vcs?: VCSProvider;
+    private vcsOptions?: VCSOptions;
+    private reporter?: WorkerReporter;
+    private role?: WorkerRole;
+    private dry: boolean;
 
-  constructor(
-    core: BacklogCore,
-    agent?: CodeAgent,
-    vcs?: VCSProvider,
-    vcsOptions?: VCSOptions,
-    role?: WorkerRole,
-  ) {
-    this.core = core;
-    const rootDir = core.getRootDir();
-    const cwd = path.dirname(rootDir);
-    this.role = role;
-    this.agent = agent ?? new OpenCodeAgent(undefined, cwd, role);
-    this.vcs = vcs;
-    this.vcsOptions = vcsOptions;
-  }
+    constructor(
+        core: BacklogCore,
+        agent?: CodeAgent,
+        vcs?: VCSProvider,
+        vcsOptions?: VCSOptions,
+        reporter?: WorkerReporter,
+        role?: WorkerRole,
+        dry = false,
+    ) {
+        this.core = core;
+        const rootDir = core.getRootDir();
+        const cwd = path.dirname(rootDir);
+        this.role = role;
+        this.reporter = reporter;
+        this.agent = agent ?? new OpenCodeAgent(undefined, cwd, role, reporter);
+        this.vcs = vcs;
+        this.vcsOptions = vcsOptions;
+        this.dry = dry;
+    }
 
   async run(): Promise<void> {
     const state = this.core.getState();
@@ -36,6 +43,7 @@ export class Worker {
     console.log(`[worker] Found ${planTasks.length} tasks in plan`);
 
     for (const task of planTasks) {
+      if (!task.source) continue;
       const content = await this.core.getTaskContent(task.source);
       const agentTask: AgentTask = {
         ...task,
@@ -50,9 +58,10 @@ export class Worker {
     const state = this.core.getState();
     const task = state.tasks.find(
       (t) =>
-        (t.slug.split("-")[0] === taskId || t.slug === taskId) && t.status === "plan",
+        (t.slug.split("-")[0] === taskId || t.slug === taskId) &&
+        (t.status as string) === "plan",
     );
-    if (task) {
+    if (task?.source) {
       const content = await this.core.getTaskContent(task.source);
       const agentTask: AgentTask = {
         id: task.slug.split("-")[0],
@@ -68,24 +77,28 @@ export class Worker {
     console.log(`[worker] Task ${taskId} not found or not in plan status`);
   }
 
-  async runWorkById(workIdentifier: string): Promise<void> {
+  /** Run all non-done tasks for a work item (when UI assigns by itemId). */
+  async runItemById(itemId: string): Promise<void> {
     const state = this.core.getState();
     const item = state.items.find(
       (i) =>
-        i.slug.split("-")[0] === workIdentifier ||
-        i.slug === workIdentifier ||
-        i.slug.toLowerCase() === workIdentifier.toLowerCase(),
+        i.slug.split("-")[0] === itemId ||
+        i.slug === itemId ||
+        i.slug.toLowerCase() === itemId.toLowerCase(),
     );
 
     if (!item) {
-      console.error(`[worker] Work "${workIdentifier}" not found`);
+      console.error(`[worker] Item "${itemId}" not found`);
       return;
     }
 
-    console.log(`[worker] Executing work: ${item.slug}`);
+    console.log(`[worker] Executing item: ${item.slug}`);
 
-    const tasksForItem = state.tasks.filter((t) => t.itemSlug === item.slug);
+    const tasksForItem = state.tasks
+      .filter((t) => t.itemSlug === item.slug && (t.status as string) !== "done")
+      .sort((a, b) => (a.priority ?? "").localeCompare(b.priority ?? "", undefined, { numeric: true }));
     for (const task of tasksForItem) {
+      if (!task.source) continue;
       const content = await this.core.getTaskContent(task.source);
       const basename = path.basename(task.source, ".md");
       const id = basename.match(/^(\d+)-/)?.[1] ?? task.slug;
@@ -147,6 +160,16 @@ export class Worker {
 
     console.log(`[worker] Running planner on work item: ${item.slug}`);
     await this.executeTask(agentTask);
+    if (this.dry) return;
+    this.core.refresh();
+    const stateAfter = this.core.getState();
+    const planTasks = stateAfter.tasks.filter(
+      (t) => (t.itemSlug === item.slug || t.itemSlug === itemSlug) && t.status === "plan",
+    );
+    for (const t of planTasks) {
+      await this.core.updateTaskStatus(t.source, "open");
+      console.log(`[worker] Moved task to open: ${t.name}`);
+    }
   }
 
   private parseItemIndexContent(content: string): { title: string; description: string } {
@@ -189,10 +212,11 @@ export class Worker {
         tid === taskId ||
         t.slug === taskId ||
         t.source === taskId ||
+        `${t.itemSlug}/${t.priority}` === taskId ||
         t.name.toLowerCase() === taskId.toLowerCase()
       );
     });
-    if (task) {
+    if (task?.source) {
       const content = await this.core.getTaskContent(task.source);
       const basename = path.basename(task.source, ".md");
       const id = basename.match(/^(\d+)-/)?.[1] ?? task.slug;
@@ -224,7 +248,7 @@ export class Worker {
 
   private getPlanTasks(state: BacklogOutput): AgentTask[] {
     return state.tasks
-      .filter((t) => t.status === "plan")
+      .filter((t) => (t.status as string) === "plan")
       .map((t) => {
         const basename = path.basename(t.source, ".md");
         const id = basename.match(/^(\d+)-/)?.[1] ?? t.slug;
@@ -243,9 +267,15 @@ export class Worker {
     const isDirect = task.id === "direct";
     const isExecuteOnly = task.executeOnly === true;
 
-    if (!isDirect && !isExecuteOnly) {
+    this.reporter?.reportStatus({
+      status: "running",
+      taskId: task.id,
+      taskTitle: task.title,
+    });
+
+    if (!isDirect && !isExecuteOnly && task.source) {
       console.log(`[worker] Executing task: ${task.title}`);
-      await this.core.updateTaskStatus(task.source, "in-progress");
+      if (!this.dry) await this.core.updateTaskStatus(task.source, "in-progress");
     } else if (isDirect) {
       console.log(`[worker] Executing prompt: ${task.title}`);
     } else {
@@ -257,20 +287,19 @@ export class Worker {
       if (result.success) {
         console.log(`[worker] Task completed successfully`);
 
-        if (this.role?.id === "planner" && task.itemSlug && result.json) {
+        if (!this.dry && this.role?.id === "planner" && task.itemSlug && result.json) {
           const tasksCreated = (result.json as { tasksCreated?: { title: string; status?: string }[] }).tasksCreated;
           if (Array.isArray(tasksCreated) && tasksCreated.length > 0) {
             for (const t of tasksCreated) {
               const title = t?.title?.trim();
               if (!title) continue;
-              const status = t.status === "plan" ? "plan" : "open";
-              await this.core.addTask(task.itemSlug, { title, status });
-              console.log(`[worker] Created task: ${title} (${status})`);
+              await this.core.addTask(task.itemSlug, { title, status: "plan" });
+              console.log(`[worker] Created task: ${title} (plan)`);
             }
           }
         }
 
-        if (!isDirect && !isExecuteOnly) {
+        if (!this.dry && !isDirect && !isExecuteOnly && task.source) {
           await this.core.updateTaskStatus(task.source, "done");
 
           if (task.acceptanceCriteria.length > 0) {
@@ -283,20 +312,22 @@ export class Worker {
           }
         }
 
-        if (this.vcs && this.vcsOptions?.autoCommit) {
+        if (!this.dry && this.vcs && this.vcsOptions?.autoCommit) {
           await this.commitVCS(task);
         }
       } else {
         console.error(`[worker] Task failed:`, result.error);
-        if (!isDirect && !isExecuteOnly) {
+        if (!this.dry && !isDirect && !isExecuteOnly && task.source) {
           await this.core.updateTaskStatus(task.source, "open");
         }
       }
     } catch (error) {
       console.error(`[worker] Task failed:`, error);
-      if (!isDirect && !isExecuteOnly) {
+      if (!this.dry && !isDirect && !isExecuteOnly && task.source) {
         await this.core.updateTaskStatus(task.source, "open");
       }
+    } finally {
+      this.reporter?.reportStatus({ status: "idle" });
     }
   }
 

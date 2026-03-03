@@ -51,7 +51,7 @@ export function NotificationBanner({
             </div>
             <button
               onClick={() => setDismissedErrors(true)}
-              className="text-red-400 hover:text-red-600 text-lg leading-none shrink-0 cursor-pointer"
+              className="text-red-400 hover:text-red-600 text-lg leading-none shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 rounded"
               aria-label="Dismiss errors"
             >
               &times;
@@ -84,7 +84,7 @@ export function NotificationBanner({
             </div>
             <button
               onClick={() => setDismissedWarnings(true)}
-              className="text-amber-400 hover:text-amber-600 text-lg leading-none shrink-0 cursor-pointer"
+              className="text-amber-400 hover:text-amber-600 text-lg leading-none shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 rounded"
               aria-label="Dismiss warnings"
             >
               &times;

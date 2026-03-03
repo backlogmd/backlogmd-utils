@@ -76,6 +76,49 @@ export function patchMetadataField(
 }
 
 /**
+ * Patch or add a metadata field in a task file METADATA section (SPEC v2/v4).
+ * If the field exists, its value is replaced; otherwise the field is added after "status:".
+ */
+export function patchOrAddTaskMetadataField(
+  content: string,
+  field: string,
+  newValue: string,
+): { patched: string; original: string; replacement: string } {
+  const metaStart = content.indexOf("<!-- METADATA -->");
+  const metaEnd = content.indexOf("<!-- /METADATA -->");
+
+  if (metaStart === -1 || metaEnd === -1) {
+    throw new Error("METADATA section not found in content");
+  }
+
+  const metaSection = content.slice(
+    metaStart,
+    metaEnd + "<!-- /METADATA -->".length,
+  );
+
+  const escapedField = escapeRegExp(field);
+  const existingPattern = new RegExp(`^(${escapedField}:\\s*).+$`, "m");
+  const match = metaSection.match(existingPattern);
+
+  if (match) {
+    const original = match[0];
+    const replacement = `${match[1]}${newValue}`;
+    const patchedSection = metaSection.replace(original, replacement);
+    const patched = content.replace(metaSection, patchedSection);
+    return { patched, original, replacement };
+  }
+
+  // Add field after status: line
+  const statusPattern = /^(status:\s*[\w-]+)\s*$/m;
+  const statusMatch = metaSection.match(statusPattern);
+  const insertAfter = statusMatch ? statusMatch[0] : metaSection.split("\n")[0] ?? "";
+  const newLine = `\n${field}: ${newValue}`;
+  const patchedSection = metaSection.replace(insertAfter, insertAfter + newLine);
+  const patched = content.replace(metaSection, patchedSection);
+  return { patched, original: insertAfter, replacement: insertAfter + newLine };
+}
+
+/**
  * Patch or add a metadata field in a SPEC v4 item index (work/<slug>/index.md).
  * The METADATA section has no closing tag; it ends at the next "<!--".
  * If the field exists, its value is replaced; otherwise the field is added after "status:".
@@ -116,4 +159,43 @@ export function patchItemIndexMetadataField(
   const patchedSection = metaSection.replace(insertAfter, insertAfter + newLine);
   const patched = content.replace(metaSection, patchedSection);
   return { patched, original: insertAfter, replacement: insertAfter + newLine };
+}
+
+/**
+ * Get the body of a SPEC v4 work item index (work/<slug>/index.md).
+ * Body is everything after the METADATA fenced block (DESCRIPTION, CONTEXT, etc.).
+ */
+export function getItemIndexBody(content: string): string {
+  const metaStart = content.indexOf("<!-- METADATA -->");
+  if (metaStart === -1) return content;
+  const afterMeta = content.slice(metaStart + "<!-- METADATA -->".length);
+  const codeOpen = afterMeta.indexOf("```");
+  if (codeOpen === -1) return content;
+  const codeClose = afterMeta.indexOf("```", codeOpen + 3);
+  if (codeClose === -1) return content;
+  const bodyStart = codeClose + 3;
+  const rest = afterMeta.slice(bodyStart);
+  const trimStart = rest.startsWith("\n") ? rest.slice(1) : rest;
+  return trimStart.trimEnd();
+}
+
+/**
+ * Replace the body of a SPEC v4 work item index (everything after METADATA).
+ * Preserves METADATA; overwrites DESCRIPTION, CONTEXT, and any following content.
+ */
+export function setItemIndexBody(content: string, newBody: string): string {
+  const metaStart = content.indexOf("<!-- METADATA -->");
+  if (metaStart === -1) return content;
+  const afterMeta = content.slice(metaStart + "<!-- METADATA -->".length);
+  const codeOpen = afterMeta.indexOf("```");
+  if (codeOpen === -1) return content;
+  const codeClose = afterMeta.indexOf("```", codeOpen + 3);
+  if (codeClose === -1) return content;
+  const bodyStartInAfter = codeClose + 3;
+  const metaSectionWithFence = content.slice(
+    metaStart,
+    metaStart + "<!-- METADATA -->".length + bodyStartInAfter,
+  );
+  const normalizedBody = newBody.trimEnd() ? newBody.trimEnd() + "\n" : "";
+  return metaSectionWithFence + "\n" + normalizedBody;
 }

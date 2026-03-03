@@ -38,9 +38,6 @@ jobs:
       - name: Build workers
         run: npm run build -w @backlogmd/workers
 
-      - name: Build autopilot
-        run: npm run build -w @backlogmd/autopilot
-
       - name: Build serve
         run: npm run build -w @backlogmd/serve
 

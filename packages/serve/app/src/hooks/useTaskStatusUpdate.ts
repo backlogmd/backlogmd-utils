@@ -5,13 +5,13 @@ export function useTaskStatusUpdate() {
   const [error, setError] = useState<string | null>(null);
 
   const updateTaskStatus = useCallback(
-    async (taskSource: string, newStatus: string): Promise<void> => {
+    async (taskId: string, newStatus: string): Promise<void> => {
       setError(null);
-      setPendingTasks((prev) => new Set(prev).add(taskSource));
+      setPendingTasks((prev) => new Set(prev).add(taskId));
 
       try {
-        const encodedSource = encodeURIComponent(taskSource);
-        const res = await fetch(`/api/tasks/${encodedSource}`, {
+        const encoded = encodeURIComponent(taskId);
+        const res = await fetch(`/api/tasks/${encoded}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: newStatus }),
@@ -28,7 +28,7 @@ export function useTaskStatusUpdate() {
       } finally {
         setPendingTasks((prev) => {
           const next = new Set(prev);
-          next.delete(taskSource);
+          next.delete(taskId);
           return next;
         });
       }

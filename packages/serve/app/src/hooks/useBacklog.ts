@@ -1,32 +1,19 @@
 import { useState, useEffect, useRef } from "react";
+import type { BacklogStateDto } from "@backlogmd/types";
 
-export interface ValidationIssue {
-  code: string;
-  message: string;
-  source: string;
-}
-
-interface BacklogData {
-  entries: unknown[];
-  items: unknown[];
-  tasks: unknown[];
-  validation?: {
-    errors: ValidationIssue[];
-    warnings: ValidationIssue[];
-  };
-  [key: string]: unknown;
-}
+export type { BacklogStateDto };
 
 declare global {
   interface Window {
-    __BACKLOG__?: BacklogData;
+    __BACKLOG__?: BacklogStateDto;
     __CHAT_ENABLED__?: boolean;
   }
 }
 
 export function useBacklog() {
-  const [data, setData] = useState<BacklogData | null>(() => window.__BACKLOG__ ?? null);
+  const [data, setData] = useState<BacklogStateDto | null>(() => window.__BACKLOG__ ?? null);
   const [connected, setConnected] = useState(false);
+  const [workerCount, setWorkerCount] = useState(0);
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -41,6 +28,15 @@ export function useBacklog() {
         fetch("/api/backlog")
           .then((res) => res.json())
           .then((json) => setData(json));
+        return;
+      }
+      try {
+        const payload = JSON.parse(event.data) as { type?: string; workers?: number };
+        if (payload?.type === "status" && typeof payload.workers === "number") {
+          setWorkerCount(payload.workers);
+        }
+      } catch {
+        // ignore non-JSON messages
       }
     };
 
@@ -53,5 +49,5 @@ export function useBacklog() {
   const errors = data?.validation?.errors ?? [];
   const warnings = data?.validation?.warnings ?? [];
 
-  return { data, connected, errors, warnings };
+  return { data, connected, errors, warnings, workerCount } as const;
 }

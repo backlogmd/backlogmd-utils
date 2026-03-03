@@ -20,3 +20,4 @@ export {
   serializeOutput,
   writeOutput,
 } from "./emit.js";
+export { isUrl, fetchContent } from "./fetch.js";
