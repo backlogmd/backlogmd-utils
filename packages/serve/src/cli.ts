@@ -1,5 +1,14 @@
 #!/usr/bin/env node
 
+const nodeMajor = parseInt(process.versions.node.split(".")[0], 10);
+if (nodeMajor < 22) {
+    console.error(
+        `Error: Node.js 22 or higher is required (you have v${process.versions.node}).`,
+    );
+    console.error("Please upgrade Node.js: https://nodejs.org");
+    process.exit(1);
+}
+
 import "dotenv/config";
 import path from "path";
 import fs from "node:fs";
@@ -9,7 +18,9 @@ import { startServer } from "./index.js";
 import { resolveBacklogRoot } from "./shared/os.js";
 
 const __filename = fileURLToPath(import.meta.url);
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === __filename;
+const isMain =
+    process.argv[1] &&
+    fs.realpathSync(path.resolve(process.argv[1])) === __filename;
 
 export interface CliArgs {
     /** Project root directory (must contain .backlogmd/) */
@@ -43,7 +54,7 @@ export function parseArgs(argv: string[]): CliArgs {
                 }
                 args.rootDir = path.resolve(argv[++i]);
                 break;
-            case "--port":
+            case "--port": {
                 if (i + 1 >= argv.length) {
                     throw new Error("--port requires a port argument");
                 }
@@ -53,6 +64,7 @@ export function parseArgs(argv: string[]): CliArgs {
                 }
                 args.port = port;
                 break;
+            }
             case "--host":
                 if (i + 1 >= argv.length) {
                     throw new Error("--host requires a host argument");

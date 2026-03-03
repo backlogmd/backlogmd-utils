@@ -1,5 +1,14 @@
 #!/usr/bin/env node
 
+const nodeMajor = parseInt(process.versions.node.split(".")[0], 10);
+if (nodeMajor < 22) {
+    console.error(
+        `Error: Node.js 22 or higher is required (you have v${process.versions.node}).`,
+    );
+    console.error("Please upgrade Node.js: https://nodejs.org");
+    process.exit(1);
+}
+
 import path from "node:path";
 import { runWorkerLoop } from "./runLoop.js";
 import { PLANNER_ROLE } from "./constants.js";

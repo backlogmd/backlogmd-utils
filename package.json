@@ -15,7 +15,7 @@
         "lint": "eslint src/ tests/",
         "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'",
         "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts'",
-        "build:all": "npm run build -w @backlogmd/types && npm run build -w @backlogmd/parser && npm run build -w @backlogmd/writer && npm run build -w @backlogmd/vcs && npm run build -w @backlogmd/workers && npm run build -w @backlogmd/serve",
+        "build:all": "npm run build -w @backlogmd/types && npm run build -w @backlogmd/parser && npm run build -w @backlogmd/writer && npm run build -w @backlogmd/vcs && npm run build -w @backlogmd/core && npm run build -w @backlogmd/workers && npm run build -w @backlogmd/serve",
         "serve": "npm run build:app -w @backlogmd/serve && tsx packages/serve/src/cli.ts",
         "serve:dev": "NODE_ENV=development tsx packages/serve/src/cli.ts",
         "serve:watch": "tsx watch --include 'packages/*/src/**/*' --include 'packages/serve/app/**/*' packages/serve/src/cli.ts",
