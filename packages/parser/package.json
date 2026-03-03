@@ -1,6 +1,6 @@
 {
   "name": "@backlogmd/parser",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Parse BacklogMD markdown into canonical JSON",
   "type": "module",
   "license": "MIT",
