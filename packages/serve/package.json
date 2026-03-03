@@ -1,6 +1,6 @@
 {
   "name": "@backlogmd/serve",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Development server for BacklogMD kanban board",
   "type": "module",
   "license": "MIT",

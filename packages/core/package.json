@@ -1,6 +1,6 @@
 {
   "name": "@backlogmd/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "High-level API for BacklogMD with SPEC v4 — uses parser to read, writer to write",
   "type": "module",
   "license": "MIT",
