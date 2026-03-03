@@ -5,10 +5,14 @@ export type { WorkerReportBody, WorkerState } from "./workerRegistry.js";
 import type { WorkerReportBody, WorkerState } from "./workerRegistry.js";
 import type { AssignmentMessage } from "./assignmentQueue.js";
 
+export type ChatAgent = { invoke: (args: { input: string }) => Promise<{ output: unknown }> };
+
 export interface AppContext {
     backlogDir: string;
     /** Single source of truth for backlog state; all reads/writes go through this. */
     backlogmd: Backlogmd;
+    /** Returns a chat agent instance, or null if unavailable (e.g. no API key). */
+    getChatAgent: () => Promise<ChatAgent | null>;
     notifyClients: () => void;
     /** Broadcast a worker update to all SSE clients. */
     broadcastWorkerUpdate: (payload: WorkerReportBody) => void;
